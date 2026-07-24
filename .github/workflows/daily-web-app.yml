@@ -36,7 +36,10 @@ jobs:
       - name: Build today's web app
         uses: anthropics/claude-code-action@v1
         with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Uses your Claude Pro/Max SUBSCRIPTION via an OAuth token — no
+          # pay-per-use API billing. Generate it with `claude setup-token`
+          # and save it as the repo secret CLAUDE_CODE_OAUTH_TOKEN.
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           claude_args: "--max-turns 40"
           prompt: |
             You have ~30 minutes to build ONE new small, self-contained web app of

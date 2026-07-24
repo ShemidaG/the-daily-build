@@ -1,0 +1,60 @@
+name: Daily Web App (Claude)
+
+# Builds one small web app every day at 12:00 PM Manila time (UTC+8 = 04:00 UTC).
+# Runs independently of any live Claude Code session.
+
+on:
+  schedule:
+    # 04:00 UTC == 12:00 PM Asia/Manila (Manila has no DST, always UTC+8)
+    - cron: "0 4 * * *"
+  workflow_dispatch: {} # allow manual "Run workflow" from the Actions tab
+
+permissions:
+  contents: write # let Claude commit and push the new app
+
+concurrency:
+  group: daily-web-app
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout series branch
+        uses: actions/checkout@v4
+        with:
+          ref: claude/daily-web-app-creation-kzfac0
+          fetch-depth: 0
+          persist-credentials: true # so `git push` uses GITHUB_TOKEN
+
+      - name: Configure git identity
+        run: |
+          git config user.name "claude-daily[bot]"
+          git config user.email "claude-daily@users.noreply.github.com"
+
+      - name: Build today's web app
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          claude_args: "--max-turns 40"
+          prompt: |
+            You have ~30 minutes to build ONE new small, self-contained web app of
+            your own choosing. Pick the idea yourself — do not ask anyone. You are
+            running in a checkout of this repo on branch
+            claude/daily-web-app-creation-kzfac0.
+
+            Steps:
+            1. Look at the existing apps in daily-apps/ so you choose a NEW idea
+               (different from FocusFlow and anything else already there).
+            2. Create daily-apps/<YYYY-MM-DD>-<appname>/index.html — a polished,
+               single-file HTML/CSS/JS app that works fully offline. Design the UI
+               yourself; make it clean, responsive, and genuinely usable. Support a
+               dark and light appearance where it makes sense.
+            3. Add a new gallery card to daily-apps/index.html between the
+               <!-- APPS:START --> and <!-- APPS:END --> markers: increment the Day
+               number, use today's UTC date, and give it an emoji, name, and a
+               one-line description.
+            4. Commit with a clear message describing the app, then push:
+               git push origin HEAD:claude/daily-web-app-creation-kzfac0
+            5. Do NOT open a pull request. Keep scope to roughly 30 minutes.

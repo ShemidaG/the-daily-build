@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FocusFlow — Pomodoro & Tasks</title>
+<style>
+  :root {
+    --bg: #0f1226;
+    --bg-soft: #171a35;
+    --card: #1d2142;
+    --accent: #7c8cff;
+    --accent-2: #58e6c9;
+    --danger: #ff7089;
+    --text: #eef0ff;
+    --muted: #9aa0cf;
+    --ring: #2a2f5c;
+    --shadow: 0 20px 50px -20px rgba(0,0,0,.6);
+    --radius: 20px;
+  }
+  [data-theme="light"] {
+    --bg: #eef1fb;
+    --bg-soft: #e4e8f7;
+    --card: #ffffff;
+    --accent: #5766e0;
+    --accent-2: #12b5a0;
+    --danger: #e04667;
+    --text: #1a1d3a;
+    --muted: #5b628f;
+    --ring: #d5daf0;
+    --shadow: 0 20px 50px -24px rgba(40,50,120,.35);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: radial-gradient(1200px 800px at 80% -10%, var(--bg-soft), var(--bg)) fixed;
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 32px 16px 64px;
+    transition: background .4s ease, color .4s ease;
+  }
+  header {
+    width: 100%; max-width: 880px;
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 28px;
+  }
+  .brand { display: flex; align-items: center; gap: 12px; font-weight: 800; font-size: 20px; letter-spacing: .3px; }
+  .brand .dot {
+    width: 32px; height: 32px; border-radius: 10px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    box-shadow: 0 6px 18px -6px var(--accent);
+  }
+  .theme-btn {
+    border: 1px solid var(--ring); background: var(--card); color: var(--text);
+    width: 42px; height: 42px; border-radius: 12px; cursor: pointer; font-size: 18px;
+    transition: transform .15s ease, border-color .2s ease;
+  }
+  .theme-btn:hover { transform: translateY(-2px); border-color: var(--accent); }
+  .layout { width: 100%; max-width: 880px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 720px) { .layout { grid-template-columns: 1fr; } }
+  .card {
+    background: var(--card); border: 1px solid var(--ring);
+    border-radius: var(--radius); padding: 26px; box-shadow: var(--shadow);
+  }
+  .timer-card { display: flex; flex-direction: column; align-items: center; text-align: center; }
+  .modes { display: flex; gap: 8px; background: var(--bg-soft); padding: 6px; border-radius: 14px; margin-bottom: 22px; }
+  .mode {
+    border: none; background: transparent; color: var(--muted); cursor: pointer;
+    padding: 9px 16px; border-radius: 10px; font-weight: 600; font-size: 13px; transition: all .2s ease;
+  }
+  .mode.active { background: var(--accent); color: #fff; box-shadow: 0 8px 20px -8px var(--accent); }
+  .ring-wrap { position: relative; width: 240px; height: 240px; margin: 6px 0 20px; }
+  svg { transform: rotate(-90deg); }
+  .ring-bg { stroke: var(--ring); }
+  .ring-fg { stroke: url(#grad); transition: stroke-dashoffset 1s linear; stroke-linecap: round; }
+  .time-display {
+    position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  }
+  .time-display .t { font-size: 52px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: 1px; }
+  .time-display .label { color: var(--muted); font-size: 13px; margin-top: 4px; text-transform: uppercase; letter-spacing: 2px; }
+  .controls { display: flex; gap: 12px; }
+  .btn {
+    border: none; cursor: pointer; font-weight: 700; font-size: 15px; padding: 14px 30px; border-radius: 14px;
+    transition: transform .15s ease, filter .2s ease;
+  }
+  .btn:active { transform: scale(.96); }
+  .btn.primary { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; box-shadow: 0 12px 28px -12px var(--accent); }
+  .btn.primary:hover { filter: brightness(1.08); }
+  .btn.ghost { background: var(--bg-soft); color: var(--text); border: 1px solid var(--ring); }
+  .stats { display: flex; gap: 18px; margin-top: 24px; }
+  .stat { text-align: center; }
+  .stat .n { font-size: 26px; font-weight: 800; }
+  .stat .l { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 1px; }
+  .tasks-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .tasks-head h2 { font-size: 17px; }
+  .tasks-head .count { color: var(--muted); font-size: 13px; }
+  .add-row { display: flex; gap: 8px; margin-bottom: 16px; }
+  .add-row input {
+    flex: 1; background: var(--bg-soft); border: 1px solid var(--ring); color: var(--text);
+    padding: 12px 14px; border-radius: 12px; font-size: 14px; outline: none; transition: border-color .2s ease;
+  }
+  .add-row input:focus { border-color: var(--accent); }
+  .add-row button {
+    background: var(--accent); color: #fff; border: none; width: 46px; border-radius: 12px; font-size: 22px; cursor: pointer;
+  }
+  ul { list-style: none; display: flex; flex-direction: column; gap: 8px; max-height: 320px; overflow-y: auto; }
+  li {
+    display: flex; align-items: center; gap: 12px; background: var(--bg-soft);
+    padding: 12px 14px; border-radius: 12px; border: 1px solid transparent; transition: border-color .2s ease;
+  }
+  li:hover { border-color: var(--ring); }
+  li.done .txt { text-decoration: line-through; color: var(--muted); }
+  .check {
+    width: 22px; height: 22px; border-radius: 7px; border: 2px solid var(--ring); cursor: pointer;
+    flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: all .2s ease;
+  }
+  li.done .check { background: var(--accent-2); border-color: var(--accent-2); color: #062; }
+  .txt { flex: 1; font-size: 14px; word-break: break-word; }
+  .del { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 18px; opacity: .6; transition: all .2s ease; }
+  .del:hover { color: var(--danger); opacity: 1; }
+  .empty { text-align: center; color: var(--muted); font-size: 14px; padding: 24px 0; }
+  footer { color: var(--muted); font-size: 12px; margin-top: 32px; text-align: center; }
+</style>
+</head>
+<body>
+  <header>
+    <div class="brand"><span class="dot"></span> FocusFlow</div>
+    <button class="theme-btn" id="themeBtn" title="Toggle theme">🌙</button>
+  </header>
+
+  <div class="layout">
+    <section class="card timer-card">
+      <div class="modes">
+        <button class="mode active" data-min="25">Focus</button>
+        <button class="mode" data-min="5">Short Break</button>
+        <button class="mode" data-min="15">Long Break</button>
+      </div>
+      <div class="ring-wrap">
+        <svg width="240" height="240" viewBox="0 0 240 240">
+          <defs>
+            <linearGradient id="grad" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="var(--accent)" />
+              <stop offset="100%" stop-color="var(--accent-2)" />
+            </linearGradient>
+          </defs>
+          <circle class="ring-bg" cx="120" cy="120" r="108" fill="none" stroke-width="14" />
+          <circle class="ring-fg" id="ringFg" cx="120" cy="120" r="108" fill="none" stroke-width="14"
+                  stroke-dasharray="678.58" stroke-dashoffset="0" />
+        </svg>
+        <div class="time-display">
+          <div class="t" id="time">25:00</div>
+          <div class="label" id="phase">Focus</div>
+        </div>
+      </div>
+      <div class="controls">
+        <button class="btn primary" id="startBtn">Start</button>
+        <button class="btn ghost" id="resetBtn">Reset</button>
+      </div>
+      <div class="stats">
+        <div class="stat"><div class="n" id="sessCount">0</div><div class="l">Sessions</div></div>
+        <div class="stat"><div class="n" id="focusMin">0</div><div class="l">Focus min</div></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="tasks-head">
+        <h2>Tasks</h2>
+        <span class="count" id="taskCount">0 open</span>
+      </div>
+      <div class="add-row">
+        <input id="taskInput" type="text" placeholder="What are you working on?" maxlength="120" />
+        <button id="addBtn">+</button>
+      </div>
+      <ul id="taskList"></ul>
+      <div class="empty" id="emptyMsg">No tasks yet — add one to get flowing.</div>
+    </section>
+  </div>
+
+  <footer>Day 1 of Claude's daily web-app series · Built 2026-07-24 · Runs fully offline, saves to your browser.</footer>
+
+<script>
+(function () {
+  const CIRC = 2 * Math.PI * 108;
+  const $ = (id) => document.getElementById(id);
+  const store = {
+    get: (k, d) => { try { return JSON.parse(localStorage.getItem("ff_" + k)) ?? d; } catch { return d; } },
+    set: (k, v) => localStorage.setItem("ff_" + k, JSON.stringify(v)),
+  };
+
+  // ---------- Theme ----------
+  const themeBtn = $("themeBtn");
+  function applyTheme(t) {
+    document.documentElement.setAttribute("data-theme", t);
+    themeBtn.textContent = t === "light" ? "🌞" : "🌙";
+    store.set("theme", t);
+  }
+  applyTheme(store.get("theme", "dark"));
+  themeBtn.onclick = () =>
+    applyTheme(document.documentElement.getAttribute("data-theme") === "light" ? "dark" : "light");
+
+  // ---------- Timer ----------
+  let total = 25 * 60, remaining = total, running = false, ticker = null, phase = "Focus";
+  const ring = $("ringFg");
+  ring.style.strokeDasharray = CIRC;
+
+  function fmt(s) {
+    const m = Math.floor(s / 60), sec = s % 60;
+    return String(m).padStart(2, "0") + ":" + String(sec).padStart(2, "0");
+  }
+  function render() {
+    $("time").textContent = fmt(remaining);
+    ring.style.strokeDashoffset = CIRC * (1 - remaining / total);
+    document.title = (running ? "▶ " : "") + fmt(remaining) + " · FocusFlow";
+  }
+  function setMode(min, label, el) {
+    document.querySelectorAll(".mode").forEach((m) => m.classList.remove("active"));
+    if (el) el.classList.add("active");
+    phase = label;
+    $("phase").textContent = label;
+    total = min * 60; remaining = total; stop(); render();
+  }
+  document.querySelectorAll(".mode").forEach((m) =>
+    m.addEventListener("click", () => setMode(+m.dataset.min, m.textContent, m))
+  );
+
+  function beep() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const notes = [880, 660, 990];
+      notes.forEach((f, i) => {
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.frequency.value = f; o.type = "sine";
+        o.connect(g); g.connect(ctx.destination);
+        const t = ctx.currentTime + i * 0.18;
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(0.25, t + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.16);
+        o.start(t); o.stop(t + 0.18);
+      });
+    } catch (e) {}
+  }
+
+  function tick() {
+    remaining--;
+    if (remaining <= 0) {
+      remaining = 0; render(); stop(); beep();
+      if (phase === "Focus") {
+        let c = store.get("sessions", 0) + 1;
+        let fm = store.get("focusMinutes", 0) + Math.round(total / 60);
+        store.set("sessions", c); store.set("focusMinutes", fm);
+        refreshStats();
+      }
+      return;
+    }
+    render();
+  }
+  function start() {
+    if (running) return;
+    running = true; $("startBtn").textContent = "Pause";
+    ticker = setInterval(tick, 1000);
+  }
+  function stop() {
+    running = false; $("startBtn").textContent = "Start";
+    clearInterval(ticker); render();
+  }
+  $("startBtn").onclick = () => (running ? stop() : start());
+  $("resetBtn").onclick = () => { remaining = total; stop(); };
+
+  function refreshStats() {
+    $("sessCount").textContent = store.get("sessions", 0);
+    $("focusMin").textContent = store.get("focusMinutes", 0);
+  }
+  refreshStats(); render();
+
+  // ---------- Tasks ----------
+  let tasks = store.get("tasks", []);
+  const list = $("taskList");
+  function saveTasks() { store.set("tasks", tasks); }
+  function renderTasks() {
+    list.innerHTML = "";
+    const open = tasks.filter((t) => !t.done).length;
+    $("taskCount").textContent = open + " open";
+    $("emptyMsg").style.display = tasks.length ? "none" : "block";
+    tasks.forEach((t, i) => {
+      const li = document.createElement("li");
+      if (t.done) li.classList.add("done");
+      const check = document.createElement("div");
+      check.className = "check"; check.textContent = t.done ? "✓" : "";
+      check.onclick = () => { tasks[i].done = !tasks[i].done; saveTasks(); renderTasks(); };
+      const txt = document.createElement("div");
+      txt.className = "txt"; txt.textContent = t.text;
+      const del = document.createElement("button");
+      del.className = "del"; del.textContent = "×";
+      del.onclick = () => { tasks.splice(i, 1); saveTasks(); renderTasks(); };
+      li.append(check, txt, del);
+      list.appendChild(li);
+    });
+  }
+  function addTask() {
+    const v = $("taskInput").value.trim();
+    if (!v) return;
+    tasks.unshift({ text: v, done: false });
+    $("taskInput").value = ""; saveTasks(); renderTasks();
+  }
+  $("addBtn").onclick = addTask;
+  $("taskInput").addEventListener("keydown", (e) => { if (e.key === "Enter") addTask(); });
+  renderTasks();
+
+  // Keyboard: space toggles timer when not typing
+  document.addEventListener("keydown", (e) => {
+    if (e.code === "Space" && document.activeElement.tagName !== "INPUT") {
+      e.preventDefault(); running ? stop() : start();
+    }
+  });
+})();
+</script>
+</body>
+</html>

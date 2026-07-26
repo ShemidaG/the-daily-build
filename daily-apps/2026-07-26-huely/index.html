@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Huely — Color Palette Generator</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    display: flex; flex-direction: column; height: 100vh; overflow: hidden; background: #111;
+  }
+  .topbar {
+    display: flex; align-items: center; gap: 14px; padding: 12px 20px;
+    background: #14141a; color: #f2f2f7; border-bottom: 1px solid #26262f; flex-shrink: 0; z-index: 10;
+    flex-wrap: wrap;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 18px; letter-spacing: .3px; }
+  .brand .dot { width: 26px; height: 26px; border-radius: 8px;
+    background: conic-gradient(from 0deg, #ff5f6d, #ffc371, #47e5bc, #5f8bff, #b06bff, #ff5f6d); }
+  .spacer { flex: 1; }
+  .tool {
+    display: flex; align-items: center; gap: 8px; background: #1e1e27; border: 1px solid #2c2c38;
+    border-radius: 10px; padding: 4px;
+  }
+  select, .btn {
+    background: #262633; color: #f2f2f7; border: 1px solid #33333f; border-radius: 8px;
+    padding: 8px 12px; font-size: 13px; font-weight: 600; cursor: pointer; outline: none;
+    transition: background .15s ease, transform .12s ease, border-color .15s ease;
+  }
+  .btn:hover { background: #32323f; border-color: #4a4a5a; }
+  .btn:active { transform: scale(.96); }
+  .btn.primary { background: linear-gradient(135deg, #6b8bff, #47e5bc); color: #06121a; border: none; }
+  .hint { color: #8a8a99; font-size: 12px; }
+  kbd {
+    background: #26262f; border: 1px solid #3a3a47; border-bottom-width: 2px; border-radius: 6px;
+    padding: 1px 7px; font-size: 12px; font-family: inherit; color: #d5d5e0;
+  }
+
+  .palette { flex: 1; display: flex; min-height: 0; }
+  .swatch {
+    flex: 1; position: relative; display: flex; flex-direction: column; align-items: center;
+    justify-content: flex-end; padding-bottom: 40px; cursor: default;
+    transition: flex .35s cubic-bezier(.4,0,.2,1);
+  }
+  .swatch .actions {
+    display: flex; flex-direction: column; align-items: center; gap: 18px;
+    opacity: 0; transform: translateY(8px); transition: opacity .2s ease, transform .2s ease;
+  }
+  .swatch:hover .actions { opacity: 1; transform: translateY(0); }
+  .swatch.locked .actions { opacity: 1; transform: translateY(0); }
+  .icon-btn {
+    background: rgba(0,0,0,.12); border: none; border-radius: 10px; width: 44px; height: 44px;
+    font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: background .15s ease, transform .12s ease;
+  }
+  .icon-btn:hover { background: rgba(0,0,0,.22); transform: translateY(-2px); }
+  .hex {
+    font-size: clamp(15px, 2.4vw, 22px); font-weight: 800; letter-spacing: 1.5px; cursor: pointer;
+    padding: 6px 12px; border-radius: 8px; user-select: all; font-variant-numeric: tabular-nums;
+    transition: background .15s ease;
+  }
+  .hex:hover { background: rgba(0,0,0,.12); }
+  .name { font-size: 12px; opacity: .78; margin-top: 4px; text-transform: capitalize; letter-spacing: .3px; }
+  .lock-badge { position: absolute; top: 16px; font-size: 16px; opacity: 0; transition: opacity .2s ease; }
+  .swatch.locked .lock-badge { opacity: .85; }
+
+  .saved-bar {
+    flex-shrink: 0; background: #14141a; border-top: 1px solid #26262f; padding: 10px 20px;
+    display: flex; align-items: center; gap: 14px; min-height: 56px; overflow-x: auto;
+  }
+  .saved-bar .label { color: #8a8a99; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .saved-item { display: flex; border-radius: 8px; overflow: hidden; cursor: pointer; flex-shrink: 0;
+    border: 1px solid #2c2c38; transition: transform .12s ease; position: relative; }
+  .saved-item:hover { transform: translateY(-2px); }
+  .saved-item i { width: 26px; height: 30px; display: block; }
+  .saved-item .rm {
+    position: absolute; top: -6px; right: -6px; background: #ff5f6d; color: #fff; border: none;
+    border-radius: 50%; width: 18px; height: 18px; font-size: 11px; cursor: pointer; display: none;
+    align-items: center; justify-content: center; line-height: 1;
+  }
+  .saved-item:hover .rm { display: flex; }
+  .saved-empty { color: #5a5a68; font-size: 12px; font-style: italic; }
+
+  .toast {
+    position: fixed; bottom: 76px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: #f2f2f7; color: #14141a; padding: 10px 18px; border-radius: 999px; font-size: 13px;
+    font-weight: 700; opacity: 0; pointer-events: none; transition: all .25s ease; box-shadow: 0 12px 30px rgba(0,0,0,.4);
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  @media (max-width: 640px) {
+    .palette { flex-direction: column; }
+    .swatch { padding-bottom: 20px; justify-content: center; }
+    .hint.wide { display: none; }
+  }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand"><span class="dot"></span> Huely</div>
+    <div class="tool">
+      <select id="scheme" title="Color harmony">
+        <option value="auto">Auto mix</option>
+        <option value="analogous">Analogous</option>
+        <option value="complementary">Complementary</option>
+        <option value="triadic">Triadic</option>
+        <option value="monochrome">Monochrome</option>
+      </select>
+      <button class="btn primary" id="genBtn">Generate</button>
+      <button class="btn" id="saveBtn" title="Save this palette">☆ Save</button>
+      <button class="btn" id="copyBtn" title="Copy all hex codes">⧉ Copy all</button>
+    </div>
+    <div class="spacer"></div>
+    <div class="hint wide">Press <kbd>Space</kbd> to generate · click a swatch's <kbd>🔓</kbd> to lock it</div>
+  </div>
+
+  <div class="palette" id="palette"></div>
+
+  <div class="saved-bar">
+    <span class="label">Saved</span>
+    <div id="savedList" style="display:flex; gap:10px;"></div>
+    <span class="saved-empty" id="savedEmpty">Nothing saved yet — hit ☆ Save to keep a palette.</span>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const store = {
+    get: (k, d) => { try { return JSON.parse(localStorage.getItem("huely_" + k)) ?? d; } catch { return d; } },
+    set: (k, v) => localStorage.setItem("huely_" + k, JSON.stringify(v)),
+  };
+  const COUNT = 5;
+
+  // ---------- color helpers ----------
+  function hslToRgb(h, s, l) {
+    s /= 100; l /= 100;
+    const k = (n) => (n + h / 30) % 12;
+    const a = s * Math.min(l, 1 - l);
+    const f = (n) => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+    return [f(0), f(8), f(4)].map((x) => Math.round(x * 255));
+  }
+  const toHex = (h, s, l) =>
+    "#" + hslToRgb(h, s, l).map((x) => x.toString(16).padStart(2, "0")).join("").toUpperCase();
+  function luminance(hex) {
+    const r = parseInt(hex.slice(1, 3), 16) / 255,
+      g = parseInt(hex.slice(3, 5), 16) / 255,
+      b = parseInt(hex.slice(5, 7), 16) / 255;
+    const f = (c) => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+    return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+  }
+  const readable = (hex) => (luminance(hex) > 0.42 ? "#141419" : "#ffffff");
+
+  // rough human-ish color name
+  const HUE_NAMES = [
+    [15, "red"], [45, "orange"], [70, "yellow"], [95, "lime"], [150, "green"],
+    [190, "teal"], [230, "blue"], [270, "indigo"], [300, "violet"], [330, "magenta"], [360, "red"],
+  ];
+  function colorName(h, s, l) {
+    if (l < 12) return "near black";
+    if (l > 92) return "near white";
+    if (s < 12) return "gray";
+    let base = "red";
+    for (const [max, n] of HUE_NAMES) { if (h <= max) { base = n; break; } }
+    const light = l > 68 ? "light " : l < 32 ? "deep " : "";
+    return light + base;
+  }
+
+  // ---------- palette generation ----------
+  let colors = []; // { h, s, l, hex, locked }
+
+  function buildScheme(baseHue) {
+    const scheme = $("scheme").value;
+    const hues = [];
+    if (scheme === "analogous") {
+      for (let i = 0; i < COUNT; i++) hues.push((baseHue + (i - 2) * 24 + 360) % 360);
+    } else if (scheme === "complementary") {
+      for (let i = 0; i < COUNT; i++) hues.push((baseHue + (i % 2) * 180 + (i * 8)) % 360);
+    } else if (scheme === "triadic") {
+      const set = [baseHue, (baseHue + 120) % 360, (baseHue + 240) % 360];
+      for (let i = 0; i < COUNT; i++) hues.push(set[i % 3]);
+    } else if (scheme === "monochrome") {
+      for (let i = 0; i < COUNT; i++) hues.push(baseHue);
+    } else {
+      for (let i = 0; i < COUNT; i++) hues.push((baseHue + (Math.random() * 90 - 45) * (i + 1)) % 360);
+    }
+    const mono = scheme === "monochrome";
+    return hues.map((h, i) => {
+      const s = mono ? 40 + i * 10 : 55 + Math.round(Math.random() * 30);
+      const l = mono ? 22 + i * 15 : 34 + i * 9 + Math.round(Math.random() * 8);
+      return { h: (h + 360) % 360, s: Math.min(s, 92), l: Math.min(Math.max(l, 12), 90) };
+    });
+  }
+
+  function generate() {
+    const base = Math.floor(Math.random() * 360);
+    const fresh = buildScheme(base);
+    colors = fresh.map((c, i) => {
+      if (colors[i] && colors[i].locked) return colors[i];
+      const hex = toHex(c.h, c.s, c.l);
+      return { ...c, hex, locked: false };
+    });
+    render();
+  }
+
+  function render() {
+    const p = $("palette");
+    p.innerHTML = "";
+    colors.forEach((c, i) => {
+      const fg = readable(c.hex);
+      const sw = document.createElement("div");
+      sw.className = "swatch" + (c.locked ? " locked" : "");
+      sw.style.background = c.hex;
+      sw.style.color = fg;
+
+      const badge = document.createElement("div");
+      badge.className = "lock-badge"; badge.textContent = "🔒";
+
+      const actions = document.createElement("div");
+      actions.className = "actions";
+
+      const lockBtn = document.createElement("button");
+      lockBtn.className = "icon-btn"; lockBtn.style.color = fg;
+      lockBtn.textContent = c.locked ? "🔒" : "🔓";
+      lockBtn.title = c.locked ? "Unlock" : "Lock this color";
+      lockBtn.onclick = () => { colors[i].locked = !colors[i].locked; render(); };
+
+      const copyOne = document.createElement("button");
+      copyOne.className = "icon-btn"; copyOne.style.color = fg;
+      copyOne.textContent = "⧉"; copyOne.title = "Copy hex";
+      copyOne.onclick = () => copy(c.hex, c.hex + " copied");
+
+      const hex = document.createElement("div");
+      hex.className = "hex"; hex.textContent = c.hex;
+      hex.title = "Click to copy";
+      hex.onclick = () => copy(c.hex, c.hex + " copied");
+
+      const nm = document.createElement("div");
+      nm.className = "name"; nm.textContent = colorName(c.h, c.s, c.l);
+
+      actions.append(lockBtn, copyOne, hex, nm);
+      sw.append(badge, actions);
+      p.appendChild(sw);
+    });
+  }
+
+  // ---------- clipboard + toast ----------
+  let toastT = null;
+  function toast(msg) {
+    const t = $("toast"); t.textContent = msg; t.classList.add("show");
+    clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("show"), 1400);
+  }
+  function copy(text, msg) {
+    const done = () => toast(msg || "Copied");
+    if (navigator.clipboard) navigator.clipboard.writeText(text).then(done).catch(fallback);
+    else fallback();
+    function fallback() {
+      const ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta);
+      ta.select(); try { document.execCommand("copy"); } catch (e) {} ta.remove(); done();
+    }
+  }
+
+  // ---------- saved palettes ----------
+  function renderSaved() {
+    const saved = store.get("saved", []);
+    const list = $("savedList");
+    list.innerHTML = "";
+    $("savedEmpty").style.display = saved.length ? "none" : "inline";
+    saved.forEach((pal, idx) => {
+      const item = document.createElement("div");
+      item.className = "saved-item"; item.title = "Load this palette";
+      pal.forEach((hex) => { const i = document.createElement("i"); i.style.background = hex; item.appendChild(i); });
+      item.onclick = (e) => {
+        if (e.target.classList.contains("rm")) return;
+        colors = pal.map((hex) => ({ hex, h: 0, s: 0, l: 0, locked: false }));
+        render();
+        toast("Palette loaded");
+      };
+      const rm = document.createElement("button");
+      rm.className = "rm"; rm.textContent = "×"; rm.title = "Remove";
+      rm.onclick = () => { const s = store.get("saved", []); s.splice(idx, 1); store.set("saved", s); renderSaved(); };
+      item.appendChild(rm);
+      list.appendChild(item);
+    });
+  }
+  function savePalette() {
+    const s = store.get("saved", []);
+    const hexes = colors.map((c) => c.hex);
+    if (s.some((p) => p.join() === hexes.join())) { toast("Already saved"); return; }
+    s.unshift(hexes);
+    if (s.length > 24) s.pop();
+    store.set("saved", s); renderSaved(); toast("Palette saved ⭐");
+  }
+
+  // ---------- wiring ----------
+  $("genBtn").onclick = generate;
+  $("saveBtn").onclick = savePalette;
+  $("copyBtn").onclick = () => copy(colors.map((c) => c.hex).join(", "), "All hex codes copied");
+  $("scheme").onchange = generate;
+  document.addEventListener("keydown", (e) => {
+    if (e.code === "Space" && e.target.tagName !== "SELECT") { e.preventDefault(); generate(); }
+    if (e.key.toLowerCase() === "s" && e.target.tagName !== "SELECT") savePalette();
+  });
+
+  generate();
+  renderSaved();
+})();
+</script>
+</body>
+</html>

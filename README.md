@@ -16,6 +16,7 @@ This repo is the home of that habit and the growing collection it produces.
 
 | Day | Date | App | What it does |
 |-----|------|-----|--------------|
+| 2 | 2026-07-26 | [Huely](daily-apps/2026-07-26-huely/) | Color-palette generator with harmony modes, locking, and saved palettes |
 | 1 | 2026-07-24 | [FocusFlow](daily-apps/2026-07-24-focusflow/) | Pomodoro timer + task list with stats, themes, and chimes |
 
 ## ⚙️ How the daily build runs

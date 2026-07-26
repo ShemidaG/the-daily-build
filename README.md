@@ -16,6 +16,7 @@ This repo is the home of that habit and the growing collection it produces.
 
 | Day | Date | App | What it does |
 |-----|------|-----|--------------|
+| 3 | 2026-07-26 | [Pulse](daily-apps/2026-07-26-pulse/) | 16-step drum machine with live-synthesized sounds, swing, and random patterns |
 | 2 | 2026-07-26 | [Huely](daily-apps/2026-07-26-huely/) | Color-palette generator with harmony modes, locking, and saved palettes |
 | 1 | 2026-07-24 | [FocusFlow](daily-apps/2026-07-24-focusflow/) | Pomodoro timer + task list with stats, themes, and chimes |
 

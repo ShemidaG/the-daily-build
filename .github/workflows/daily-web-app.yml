@@ -42,30 +42,30 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           claude_args: "--max-turns 40"
           prompt: |
-            You have ~30 minutes to build ONE new self-contained web app of your
-            own choosing. Pick the idea yourself — do not ask anyone. You are
-            running in a checkout of this repo on the main branch, which is served
-            live via GitHub Pages.
+            You have ~30 minutes to make ONE meaningful improvement to Momentum,
+            the productivity app at daily-apps/2026-07-26-momentum/index.html. You
+            are running in a checkout of this repo on the main branch, which is
+            served live via GitHub Pages. Do NOT build a new separate app — the
+            goal now is to keep improving this single tool, a little every day.
 
-            QUALITY BAR (important): build a genuinely USEFUL, non-trivial tool that
-            could earn a place in someone's real workflow — NOT a basic toy or a
-            single-purpose gadget. Aim for the depth of the flagship "Momentum" app
-            (daily-apps/2026-07-26-momentum): multiple views/modes, meaningful state,
-            keyboard shortcuts, data export/import where relevant, thoughtful UI, and
-            localStorage persistence. Prefer productivity, planning, analysis, or
-            developer/creator tools. Everything must work fully offline in one file.
+            Pick the improvement yourself (do not ask anyone). Good directions:
+            a genuinely useful NEW feature (e.g. task dependencies, calendar/week
+            view, tag manager, bulk actions, natural-language date ranges, goal
+            tracking, per-project analytics, templates, reminders, drag-to-reorder,
+            themes), or a real refinement/polish of something that already exists.
+            Prefer depth and usefulness over cosmetic tweaks.
 
-            Steps:
-            1. Look at the existing apps in daily-apps/ so you choose a NEW idea
-               (different from FocusFlow and anything else already there).
-            2. Create daily-apps/<YYYY-MM-DD>-<appname>/index.html — a polished,
-               single-file HTML/CSS/JS app that works fully offline. Design the UI
-               yourself; make it clean, responsive, and genuinely usable. Support a
-               dark and light appearance where it makes sense.
-            3. Add a new gallery card to daily-apps/index.html between the
-               <!-- APPS:START --> and <!-- APPS:END --> markers: increment the Day
-               number, use today's UTC date, and give it an emoji, name, and a
-               one-line description.
-            4. Commit with a clear message describing the app, then push:
-               git push origin HEAD:main
-            5. Do NOT open a pull request. Keep scope to roughly 30 minutes.
+            Requirements:
+            1. Momentum is ONE self-contained index.html (HTML/CSS/JS, no external
+               requests) that must keep working fully offline with localStorage.
+            2. Preserve existing user data: if you change the data model, migrate
+               old saved state gracefully rather than breaking it.
+            3. VERIFY before shipping: the repo has no test runner, but you must at
+               least syntax-check your JavaScript (e.g. extract the <script> and run
+               `node --check`) and fix any error. Chromium is available at
+               /opt/pw-browsers if you want to smoke-test in a headless browser.
+            4. Update the changelog in daily-apps/index.html between the
+               <!-- LOG:START --> and <!-- LOG:END --> markers: add a new dated entry
+               (bump the version) describing what you changed, as the newest item.
+            5. Commit with a clear message, then push: git push origin HEAD:main
+            6. Do NOT open a pull request. Keep scope to roughly 30 minutes.

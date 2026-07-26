@@ -164,6 +164,40 @@
   .bcard .bt { font-size: 13.5px; font-weight: 600; word-break: break-word; }
   .bcard .bm { display: flex; gap: 6px; margin-top: 7px; flex-wrap: wrap; }
 
+  /* ---------- Week planner ---------- */
+  .week-nav { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+  .week-nav .wbtn { border: 1px solid var(--ring); background: var(--panel); color: var(--text); cursor: pointer; border-radius: 9px; padding: 7px 12px; font-size: 13px; font-weight: 600; }
+  .week-nav .wbtn:hover { border-color: var(--accent); }
+  .week-nav .range { font-weight: 700; font-size: 14px; margin-left: 4px; }
+  .week-nav .wtoday { color: var(--accent-2); }
+  .week-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 10px; align-items: start; }
+  .wday { background: var(--bg-2); border: 1px solid var(--ring); border-radius: 12px; padding: 9px; min-height: 130px; display: flex; flex-direction: column; }
+  .wday.today { border-color: var(--accent-2); box-shadow: 0 0 0 1px var(--accent-2) inset; }
+  .wday.past { opacity: .82; }
+  .wday.drag-over { border-color: var(--accent); background: var(--panel-2); }
+  .wday-head { display: flex; align-items: baseline; gap: 6px; padding: 2px 4px 9px; }
+  .wday-head .dow { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--faint); }
+  .wday-head .dnum { font-size: 15px; font-weight: 800; }
+  .wday.today .dnum { color: var(--accent-2); }
+  .wday-head .wadd { margin-left: auto; cursor: pointer; color: var(--faint); font-size: 16px; line-height: 1; }
+  .wday-head .wadd:hover { color: var(--accent-2); }
+  .wadd-input { width: 100%; background: var(--panel); border: 1px solid var(--accent); border-radius: 7px; padding: 6px 8px; font-size: 12px; outline: none; margin-bottom: 7px; }
+  .wcard { background: var(--panel); border: 1px solid var(--ring); border-left: 3px solid var(--p4); border-radius: 9px; padding: 7px 8px; margin-bottom: 7px; cursor: grab; font-size: 12.5px; display: flex; gap: 7px; align-items: flex-start; }
+  .wcard:active { cursor: grabbing; } .wcard.dragging { opacity: .4; }
+  .wcard.pdone { opacity: .55; } .wcard.pdone .wc-t { text-decoration: line-through; color: var(--faint); }
+  .wcard .wc-check { width: 15px; height: 15px; border-radius: 4px; border: 2px solid var(--ring-2); flex-shrink: 0; cursor: pointer; margin-top: 1px; display: flex; align-items: center; justify-content: center; font-size: 10px; color: transparent; }
+  .wcard.pdone .wc-check { background: var(--ok); border-color: var(--ok); color: #052; }
+  .wcard .wc-t { flex: 1; min-width: 0; word-break: break-word; font-weight: 600; }
+  .wcard .wc-pj { font-size: 10px; margin-top: 3px; }
+  .wempty { color: var(--faint); font-size: 11px; text-align: center; padding: 8px 0; }
+  .backlog { margin-top: 18px; background: var(--bg-2); border: 1px dashed var(--ring-2); border-radius: 12px; padding: 12px 14px; }
+  .backlog.drag-over { border-color: var(--accent); border-style: solid; background: var(--panel-2); }
+  .backlog h4 { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--faint); margin-bottom: 10px; }
+  .backlog-items { display: flex; flex-wrap: wrap; gap: 8px; }
+  .backlog .wcard { margin-bottom: 0; width: auto; max-width: 240px; }
+  .backlog-empty { color: var(--faint); font-size: 12px; font-style: italic; }
+  @media (max-width: 860px) { .week-grid { grid-auto-flow: column; grid-template-columns: none; grid-auto-columns: 150px; overflow-x: auto; } }
+
   /* ---------- Analytics ---------- */
   .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 22px; }
   .stat-card { background: var(--panel); border: 1px solid var(--ring); border-radius: 14px; padding: 18px; }
@@ -227,6 +261,7 @@
     <nav class="nav" id="nav">
       <button data-view="today"><span class="ico">☀️</span> Today <span class="badge" id="b-today">0</span></button>
       <button data-view="upcoming"><span class="ico">🗓️</span> Upcoming <span class="badge" id="b-up">0</span></button>
+      <button data-view="week"><span class="ico">📆</span> Week</button>
       <button data-view="all"><span class="ico">🗂️</span> All Tasks <span class="badge" id="b-all">0</span></button>
       <button data-view="board"><span class="ico">📋</span> Board</button>
       <button data-view="analytics"><span class="ico">📊</span> Analytics</button>
@@ -428,6 +463,8 @@
   let openTaskId = null;
   let searchQ = "";
   let listOpts = { sort: "smart", priority: "all", tag: "all" };
+  let weekAnchor = new Date();
+  let weekAddDay = null; // day key currently showing an inline add input
 
   function applyListOpts(list) {
     let out = list;
@@ -612,6 +649,85 @@
     root.appendChild(wrap);
   }
 
+  // ---------- week planner ----------
+  function weekStartOf(d) { const x = new Date(d); const dow = (x.getDay() + 6) % 7; return addDays(x, -dow); } // Monday start
+  function addTaskWithDue(title, dueKey) { const v = (title || "").trim(); if (!v) return; const p = parseQuick(v); if (!p.due) p.due = dueKey; state.tasks.unshift(mkTask(p.title, p)); save(); }
+  function wcardEl(t) {
+    const c = document.createElement("div"); c.className = "wcard" + (t.done ? " pdone" : "");
+    c.draggable = true; c.dataset.id = t.id; c.style.borderLeftColor = P_COLORS[t.priority];
+    const pj = projById(t.projectId);
+    c.innerHTML = '<div class="wc-check">' + (t.done ? "✓" : "") + '</div><div style="flex:1;min-width:0"><div class="wc-t">' + esc(t.title) + "</div>" +
+      (pj ? '<div class="wc-pj chip proj"><span style="width:6px;height:6px;border-radius:50%;background:' + pj.color + ';display:inline-block"></span>' + esc(pj.name) + "</div>" : "") +
+      (t.repeat && t.repeat !== "none" ? ' <span class="wc-pj" style="color:var(--faint)">🔁</span>' : "") + "</div>";
+    $(".wc-check", c).onclick = (e) => { e.stopPropagation(); toggleDone(t.id); };
+    c.addEventListener("dragstart", (e) => { c.classList.add("dragging"); e.dataTransfer.setData("text/plain", t.id); });
+    c.addEventListener("dragend", () => c.classList.remove("dragging"));
+    c.addEventListener("dblclick", () => { openTaskFromCmd(t.id); });
+    return c;
+  }
+  function makeDropZone(el, onDropKey) {
+    el.addEventListener("dragover", (e) => { e.preventDefault(); el.classList.add("drag-over"); });
+    el.addEventListener("dragleave", () => el.classList.remove("drag-over"));
+    el.addEventListener("drop", (e) => { e.preventDefault(); el.classList.remove("drag-over");
+      const id = e.dataTransfer.getData("text/plain"); const t = state.tasks.find((x) => x.id === id); if (!t) return;
+      t.due = onDropKey; if (t.done && onDropKey) { /* keep */ } save(); render(); });
+  }
+  function renderWeek(root) {
+    const start = weekStartOf(weekAnchor);
+    const end = addDays(start, 6);
+    const list = state.tasks.filter(matchesSearch).filter((t) => !state.settings.project || t.projectId === state.settings.project);
+
+    // nav
+    const nav = document.createElement("div"); nav.className = "week-nav";
+    const fmtR = (d) => d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    const sameWeek = key(weekStartOf(new Date())) === key(start);
+    nav.innerHTML = '<button class="wbtn" id="wPrev">← Prev</button>' +
+      '<button class="wbtn' + (sameWeek ? " wtoday" : "") + '" id="wToday">This week</button>' +
+      '<button class="wbtn" id="wNext">Next →</button>' +
+      '<span class="range">' + fmtR(start) + " – " + fmtR(end) + ", " + end.getFullYear() + "</span>";
+    root.appendChild(nav);
+    $("#wPrev", nav).onclick = () => { weekAnchor = addDays(start, -7); render(); };
+    $("#wNext", nav).onclick = () => { weekAnchor = addDays(start, 7); render(); };
+    $("#wToday", nav).onclick = () => { weekAnchor = new Date(); render(); };
+
+    // grid
+    const grid = document.createElement("div"); grid.className = "week-grid";
+    const tKey = todayKey();
+    for (let i = 0; i < 7; i++) {
+      const day = addDays(start, i), dk = key(day);
+      const col = document.createElement("div");
+      col.className = "wday" + (dk === tKey ? " today" : "") + (dk < tKey ? " past" : "");
+      const head = document.createElement("div"); head.className = "wday-head";
+      head.innerHTML = '<span class="dow">' + day.toLocaleDateString(undefined, { weekday: "short" }) + '</span>' +
+        '<span class="dnum">' + day.getDate() + '</span><span class="wadd" title="Add task">＋</span>';
+      col.appendChild(head);
+      if (weekAddDay === dk) {
+        const inp = document.createElement("input"); inp.className = "wadd-input"; inp.placeholder = "New task…  (Enter)";
+        inp.onkeydown = (e) => { if (e.key === "Enter") { addTaskWithDue(e.target.value, dk); weekAddDay = dk; render(); }
+          else if (e.key === "Escape") { weekAddDay = null; render(); } };
+        col.appendChild(inp); setTimeout(() => inp.focus(), 10);
+      }
+      $(".wadd", head).onclick = () => { weekAddDay = weekAddDay === dk ? null : dk; render(); };
+      const dayTasks = list.filter((t) => t.due === dk).sort((a, b) => (a.done - b.done) || a.priority - b.priority);
+      if (!dayTasks.length && weekAddDay !== dk) { const e = document.createElement("div"); e.className = "wempty"; e.textContent = "—"; col.appendChild(e); }
+      dayTasks.forEach((t) => col.appendChild(wcardEl(t)));
+      makeDropZone(col, dk);
+      grid.appendChild(col);
+    }
+    root.appendChild(grid);
+
+    // backlog (undated, open)
+    const backlog = document.createElement("div"); backlog.className = "backlog";
+    const undated = list.filter((t) => !t.due && !t.done);
+    backlog.innerHTML = '<h4>Backlog · no date (' + undated.length + ') — drag onto a day to schedule</h4>';
+    const items = document.createElement("div"); items.className = "backlog-items";
+    if (!undated.length) items.innerHTML = '<span class="backlog-empty">Nothing unscheduled. Nice.</span>';
+    undated.forEach((t) => items.appendChild(wcardEl(t)));
+    backlog.appendChild(items);
+    makeDropZone(backlog, null);
+    root.appendChild(backlog);
+  }
+
   // ---------- analytics ----------
   function renderAnalytics(root) {
     const days = []; for (let i = 6; i >= 0; i--) days.push(addDays(new Date(), -i));
@@ -661,6 +777,7 @@
 
   // ---------- main render ----------
   const TITLES = { today: ["Today", "Everything due today or overdue"], upcoming: ["Upcoming", "Due in the next 7 days"],
+    week: ["Week", "Plan your week — drag tasks between days"],
     all: ["All Tasks", "Every open task"], board: ["Board", "Drag cards between columns"],
     analytics: ["Analytics", "Your productivity at a glance"], completed: ["Completed", "Finished and archived"] };
 
@@ -674,6 +791,7 @@
 
     const root = $("#content"); root.innerHTML = "";
     if (currentView === "board") return void renderBoard(root);
+    if (currentView === "week") return void renderWeek(root);
     if (currentView === "analytics") return void renderAnalytics(root);
 
     const tasks = applyListOpts(viewTasks());

@@ -227,6 +227,39 @@
   .list-ctrls select { border: none; background: transparent; font-size: 13px; font-weight: 600; outline: none; cursor: pointer; padding: 5px 4px; }
   .list-ctrls .clearf { margin-left: auto; font-size: 12px; color: var(--muted); background: none; border: none; cursor: pointer; font-weight: 600; }
   .list-ctrls .clearf:hover { color: var(--accent-2); }
+  .list-ctrls .lc-select { margin-left: auto; }
+  .list-ctrls .lc-select.on { color: var(--accent-2); }
+  .list-ctrls .lc-select ~ .clearf { margin-left: 0; }
+
+  /* drag-to-reorder handle + selection */
+  .t-handle { cursor: grab; color: var(--faint); font-size: 15px; padding: 0 2px 0 4px; flex-shrink: 0; user-select: none; }
+  .t-handle:active { cursor: grabbing; }
+  .task.dragging { opacity: .4; }
+  .task.drop-before { box-shadow: 0 -3px 0 var(--accent); }
+  .task.drop-after { box-shadow: 0 3px 0 var(--accent); }
+  .task.selected { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+  .t-sel { width: 20px; height: 20px; border-radius: 6px; border: 2px solid var(--ring-2); flex-shrink: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 12px; color: transparent; }
+  .task.selected .t-sel { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  /* templates bar */
+  .tpl-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .tpl-bar .tpl-lbl { font-size: 11px; color: var(--faint); font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
+  .tpl-chip { display: inline-flex; align-items: center; gap: 7px; background: var(--panel); border: 1px solid var(--ring); border-radius: 999px; padding: 5px 6px 5px 12px; font-size: 12.5px; font-weight: 600; cursor: pointer; transition: border-color .15s; }
+  .tpl-chip:hover { border-color: var(--accent); }
+  .tpl-chip .tpl-x { color: var(--faint); cursor: pointer; font-size: 13px; padding: 0 3px; }
+  .tpl-chip .tpl-x:hover { color: var(--warn); }
+
+  /* bulk action bar */
+  .bulk-bar { position: fixed; bottom: 22px; left: calc(50% + 130px); transform: translateX(-50%); z-index: 45;
+    background: var(--panel); border: 1px solid var(--ring-2); border-radius: 14px; box-shadow: var(--shadow);
+    display: flex; align-items: center; gap: 6px; padding: 8px 10px; flex-wrap: wrap; max-width: 92vw; }
+  .bulk-bar .bcount { font-weight: 800; font-size: 13px; padding: 0 8px; white-space: nowrap; }
+  .bulk-bar button { border: 1px solid var(--ring); background: var(--panel-2); color: var(--text); cursor: pointer; border-radius: 8px; padding: 7px 11px; font-size: 12.5px; font-weight: 600; }
+  .bulk-bar button:hover { border-color: var(--accent); }
+  .bulk-bar button.danger:hover { border-color: var(--warn); color: var(--warn); }
+  .bulk-bar .bsep { width: 1px; height: 22px; background: var(--ring); margin: 0 2px; }
+  .bulk-bar select { border: 1px solid var(--ring); background: var(--panel-2); color: var(--text); border-radius: 8px; padding: 7px 8px; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+  @media (max-width: 860px) { .bulk-bar { left: 50%; } }
 
   /* ---------- Command palette ---------- */
   .cmdk-back { position: fixed; inset: 0; background: rgba(6,8,20,.55); backdrop-filter: blur(3px); z-index: 60; display: none; align-items: flex-start; justify-content: center; padding-top: 12vh; }
@@ -338,7 +371,7 @@
   const P_COLORS = { 1: "var(--p1)", 2: "var(--p2)", 3: "var(--p3)", 4: "var(--p4)" };
 
   // ---------- state ----------
-  const DEFAULT = { version: 1, projects: [], tasks: [], focusLog: [], activeTaskId: null,
+  const DEFAULT = { version: 1, projects: [], tasks: [], focusLog: [], templates: [], activeTaskId: null,
                     settings: { theme: "dark", view: "today", project: null } };
   let state = load();
   function load() {
@@ -346,7 +379,7 @@
     catch (e) {}
     // seed a friendly first-run example
     const pid = uid();
-    return { version: 1, activeTaskId: null, focusLog: [],
+    return { version: 1, activeTaskId: null, focusLog: [], templates: [],
       projects: [{ id: pid, name: "Getting Started", color: PROJ_COLORS[0] }],
       settings: { theme: "dark", view: "today", project: null },
       tasks: [
@@ -363,7 +396,8 @@
     o = o || {};
     return { id: uid(), title, notes: o.notes || "", priority: o.priority || 4, due: o.due || null,
       projectId: o.projectId || null, tags: o.tags || [], subtasks: o.subtasks || [], repeat: o.repeat || "none",
-      status: o.status || "todo", done: false, createdAt: Date.now(), completedAt: null, focusSeconds: 0 };
+      status: o.status || "todo", done: false, createdAt: Date.now(), completedAt: null, focusSeconds: 0,
+      order: o.order != null ? o.order : -Date.now() };
   }
 
   // ---------- dates ----------
@@ -457,6 +491,41 @@
     toast("Task deleted", "Undo", () => { state.tasks.splice(Math.min(idx, state.tasks.length), 0, removed); save(); render(); toast("Restored"); });
   }
   function updTask(id, patch) { const t = state.tasks.find((x) => x.id === id); if (t) Object.assign(t, patch); save(); }
+  function duplicateTask(id) {
+    const t = state.tasks.find((x) => x.id === id); if (!t) return;
+    const c = mkTask(t.title + " (copy)", { priority: t.priority, projectId: t.projectId, tags: t.tags.slice(),
+      notes: t.notes, repeat: t.repeat, due: t.due, subtasks: t.subtasks.map((s) => sub(s.title, s.done)) });
+    const idx = state.tasks.findIndex((x) => x.id === id); state.tasks.splice(idx, 0, c); save(); render(); toast("Task duplicated");
+  }
+  function reorderManual(dragId, targetId, before) {
+    if (dragId === targetId) return;
+    const from = state.tasks.findIndex((x) => x.id === dragId); if (from < 0) return;
+    const moved = state.tasks.splice(from, 1)[0];
+    let ti = state.tasks.findIndex((x) => x.id === targetId); if (ti < 0) { state.tasks.splice(from, 0, moved); return; }
+    if (!before) ti++;
+    state.tasks.splice(ti, 0, moved);
+    state.tasks.forEach((t, i) => { t.order = i; });
+    save(); render();
+  }
+  // templates
+  function saveTemplate(id) {
+    const t = state.tasks.find((x) => x.id === id); if (!t) return;
+    state.templates.unshift({ id: uid(), name: t.title, priority: t.priority, projectId: t.projectId,
+      tags: t.tags.slice(), repeat: t.repeat, notes: t.notes, subtasks: t.subtasks.map((s) => s.title) });
+    if (state.templates.length > 20) state.templates.pop();
+    save(); render(); toast("Saved as template ⭐");
+  }
+  function createFromTemplate(tid) {
+    const tp = state.templates.find((x) => x.id === tid); if (!tp) return;
+    state.tasks.unshift(mkTask(tp.name, { priority: tp.priority, projectId: tp.projectId, tags: (tp.tags || []).slice(),
+      repeat: tp.repeat, notes: tp.notes, due: (tp.repeat && tp.repeat !== "none") ? todayKey() : null,
+      subtasks: (tp.subtasks || []).map((s) => sub(s, false)) }));
+    save(); render(); toast("Task added from template");
+  }
+  function delTemplate(tid) { state.templates = state.templates.filter((x) => x.id !== tid); save(); render(); }
+  // bulk
+  function bulkApply(fn, msg) { state.tasks.forEach((t) => { if (selected.has(t.id)) fn(t); }); selected.clear(); selectMode = false; save(); render(); if (msg) toast(msg); }
+  function bulkDelete() { const n = selected.size; state.tasks = state.tasks.filter((t) => !selected.has(t.id)); selected.clear(); selectMode = false; save(); render(); toast(n + " task" + (n === 1 ? "" : "s") + " deleted"); }
 
   // ---------- rendering ----------
   let currentView = state.settings.view || "today";
@@ -465,6 +534,9 @@
   let listOpts = { sort: "smart", priority: "all", tag: "all" };
   let weekAnchor = new Date();
   let weekAddDay = null; // day key currently showing an inline add input
+  let selectMode = false; // multi-select for bulk actions
+  const selected = new Set();
+  let dragReorderId = null; // task id being reordered
 
   function applyListOpts(list) {
     let out = list;
@@ -478,12 +550,13 @@
     if (s === "due") return c.sort((a, b) => (a.due || "9999").localeCompare(b.due || "9999"));
     if (s === "created") return c.sort((a, b) => b.createdAt - a.createdAt);
     if (s === "az") return c.sort((a, b) => a.title.localeCompare(b.title));
+    if (s === "manual") return c.sort((a, b) => (a.order || 0) - (b.order || 0));
     return c.sort((a, b) => a.priority - b.priority || (a.due || "9").localeCompare(b.due || "9")); // smart
   }
   function allTags() { const s = new Set(); state.tasks.forEach((t) => t.tags.forEach((x) => s.add(x))); return Array.from(s).sort(); }
   function renderListControls(root) {
     const bar = document.createElement("div"); bar.className = "list-ctrls";
-    const sortOpts = [["smart","Smart"],["priority","Priority"],["due","Due date"],["created","Newest"],["az","A–Z"]]
+    const sortOpts = [["smart","Smart"],["priority","Priority"],["due","Due date"],["created","Newest"],["az","A–Z"],["manual","Custom (drag)"]]
       .map(([v, l]) => '<option value="' + v + '"' + (listOpts.sort === v ? " selected" : "") + ">" + l + "</option>").join("");
     const prioOpts = ['<option value="all"' + (listOpts.priority === "all" ? " selected" : "") + '>All</option>']
       .concat([1,2,3,4].map((p) => '<option value="' + p + '"' + (listOpts.priority == p ? " selected" : "") + ">P" + p + "</option>")).join("");
@@ -495,12 +568,15 @@
       '<div class="lc"><label>Sort</label><select id="lc-sort">' + sortOpts + "</select></div>" +
       '<div class="lc"><label>Priority</label><select id="lc-prio">' + prioOpts + "</select></div>" +
       (tags.length ? '<div class="lc"><label>Tag</label><select id="lc-tag">' + tagOpts + "</select></div>" : "") +
+      '<button class="clearf lc-select' + (selectMode ? " on" : "") + '" id="lc-select">' + (selectMode ? "✓ Selecting" : "☑ Select") + "</button>" +
       (filtered ? '<button class="clearf" id="lc-clear">✕ Reset</button>' : "");
     root.appendChild(bar);
     $("#lc-sort", bar).onchange = (e) => { listOpts.sort = e.target.value; render(); };
     $("#lc-prio", bar).onchange = (e) => { listOpts.priority = e.target.value; render(); };
     if ($("#lc-tag", bar)) $("#lc-tag", bar).onchange = (e) => { listOpts.tag = e.target.value; render(); };
     if ($("#lc-clear", bar)) $("#lc-clear", bar).onclick = () => { listOpts = { sort: "smart", priority: "all", tag: "all" }; render(); };
+    $("#lc-select", bar).onclick = () => { selectMode = !selectMode; selected.clear(); render(); };
+    if (listOpts.sort === "manual") { const h = document.createElement("span"); h.style.cssText = "font-size:11px;color:var(--faint);width:100%;margin-top:2px"; h.textContent = "Drag the ⠿ handle to reorder tasks."; bar.appendChild(h); }
   }
 
   function activeTasks() { return state.tasks.filter((t) => !t.done); }
@@ -549,26 +625,51 @@
 
   function renderTaskItem(t) {
     const el = document.createElement("div");
-    el.className = "task" + (t.done ? " pdone" : "") + (openTaskId === t.id ? " open" : "");
+    const isSel = selected.has(t.id);
+    const reorderable = !selectMode && listOpts.sort === "manual" && (currentView === "all" || currentView === "completed");
+    el.className = "task" + (t.done ? " pdone" : "") + (openTaskId === t.id && !selectMode ? " open" : "") + (isSel ? " selected" : "");
+    const hasMeta = t.subtasks.length || t.due || t.projectId || t.tags.length || t.focusSeconds > 60 || (t.repeat && t.repeat !== "none");
+    const leftCtl = selectMode ? '<div class="t-sel" data-act="sel">' + (isSel ? "✓" : "") + "</div>"
+                               : '<div class="t-check" data-act="done"></div>';
+    const handle = reorderable ? '<div class="t-handle" title="Drag to reorder">⠿</div>' : "";
     el.innerHTML =
-      '<div class="t-row">' +
-        '<div class="t-check" data-act="done"></div>' +
+      '<div class="t-row">' + handle + leftCtl +
         '<div class="t-flag" style="background:' + P_COLORS[t.priority] + '"></div>' +
-        '<div class="t-body" data-act="open"><div class="t-title">' + esc(t.title) + '</div>' +
-          (t.subtasks.length || t.due || t.projectId || t.tags.length || t.focusSeconds > 60 ? '<div class="t-meta">' + taskChips(t) + "</div>" : "") +
+        '<div class="t-body" data-act="open"><div class="t-title">' + esc(t.title) + "</div>" +
+          (hasMeta ? '<div class="t-meta">' + taskChips(t) + "</div>" : "") +
         "</div>" +
         '<div class="t-actions">' +
           '<button data-act="focus" class="' + (state.activeTaskId === t.id ? "focusing" : "") + '" title="Set as focus task">⏱</button>' +
+          '<button data-act="dup" title="Duplicate">⧉</button>' +
           '<button data-act="open" title="Edit">✏️</button>' +
           '<button data-act="del" title="Delete">🗑</button>' +
         "</div>" +
-      "</div>" + editorHtml(t);
-    // events
-    $("[data-act=done]", el).onclick = () => toggleDone(t.id);
-    $$(".t-body,[data-act=open]", el).forEach((b) => b.onclick = () => { openTaskId = openTaskId === t.id ? null : t.id; render(); });
-    $("[data-act=focus]", el).onclick = (e) => { e.stopPropagation(); state.activeTaskId = t.id; save(); updateFocusWidget(); render(); toast("Focus task set"); };
-    $("[data-act=del]", el).onclick = (e) => { e.stopPropagation(); delTask(t.id); };
-    if (openTaskId === t.id) wireEditor(el, t);
+      "</div>" + (selectMode ? "" : editorHtml(t));
+
+    if (selectMode) {
+      const toggleSel = () => { if (selected.has(t.id)) selected.delete(t.id); else selected.add(t.id); render(); };
+      $("[data-act=sel]", el).onclick = toggleSel;
+      $(".t-body", el).onclick = toggleSel;
+    } else {
+      $("[data-act=done]", el).onclick = () => toggleDone(t.id);
+      $$(".t-body,[data-act=open]", el).forEach((b) => b.onclick = () => { openTaskId = openTaskId === t.id ? null : t.id; render(); });
+      $("[data-act=focus]", el).onclick = (e) => { e.stopPropagation(); state.activeTaskId = t.id; save(); updateFocusWidget(); render(); toast("Focus task set"); };
+      $("[data-act=dup]", el).onclick = (e) => { e.stopPropagation(); duplicateTask(t.id); };
+      $("[data-act=del]", el).onclick = (e) => { e.stopPropagation(); delTask(t.id); };
+      if (openTaskId === t.id) wireEditor(el, t);
+    }
+
+    if (reorderable) {
+      el.draggable = true;
+      el.addEventListener("dragstart", (e) => { dragReorderId = t.id; el.classList.add("dragging"); e.dataTransfer.effectAllowed = "move"; try { e.dataTransfer.setData("text/plain", t.id); } catch (_) {} });
+      el.addEventListener("dragend", () => { dragReorderId = null; el.classList.remove("dragging"); $$(".task").forEach((x) => x.classList.remove("drop-before", "drop-after")); });
+      el.addEventListener("dragover", (e) => { if (!dragReorderId || dragReorderId === t.id) return; e.preventDefault();
+        const r = el.getBoundingClientRect(); const before = e.clientY - r.top < r.height / 2;
+        el.classList.toggle("drop-before", before); el.classList.toggle("drop-after", !before); });
+      el.addEventListener("dragleave", () => el.classList.remove("drop-before", "drop-after"));
+      el.addEventListener("drop", (e) => { e.preventDefault(); const r = el.getBoundingClientRect(); const before = e.clientY - r.top < r.height / 2;
+        el.classList.remove("drop-before", "drop-after"); if (dragReorderId) reorderManual(dragReorderId, t.id, before); });
+    }
     return el;
   }
 
@@ -594,6 +695,8 @@
       '<textarea class="notes" data-ed="notes" placeholder="Notes…">' + esc(t.notes || "") + "</textarea>" +
       '<div class="subs">' + subs + "</div>" +
       '<div class="sub-add"><input data-ed="subnew" placeholder="Add a subtask…"><button data-ed="subadd">Add step</button></div>' +
+      '<div style="margin-top:12px;display:flex;gap:8px"><button class="sub-add" data-ed="savetpl" style="border:1px solid var(--ring);background:var(--panel);border-radius:8px;padding:7px 12px;cursor:pointer;font-size:12.5px;font-weight:600">⭐ Save as template</button>' +
+      '<button data-ed="dup2" style="border:1px solid var(--ring);background:var(--panel);border-radius:8px;padding:7px 12px;cursor:pointer;font-size:12.5px;font-weight:600">⧉ Duplicate</button></div>' +
     "</div>";
   }
 
@@ -608,6 +711,8 @@
     $("[data-ed=project]", el).onchange = (e) => { updTask(t.id, { projectId: e.target.value || null }); softRefresh(); };
     $("[data-ed=notes]", el).onblur = (e) => updTask(t.id, { notes: e.target.value });
     const addSub = () => { const inp = $("[data-ed=subnew]", el); const v = inp.value.trim(); if (!v) return; t.subtasks.push(sub(v, false)); save(); render(); };
+    $("[data-ed=savetpl]", el).onclick = () => saveTemplate(t.id);
+    $("[data-ed=dup2]", el).onclick = () => duplicateTask(t.id);
     $("[data-ed=subadd]", el).onclick = addSub;
     $("[data-ed=subnew]", el).onkeydown = (e) => { if (e.key === "Enter") addSub(); };
     $$(".sub-item", el).forEach((si) => {
@@ -759,6 +864,30 @@
     });
     chart.appendChild(c); root.appendChild(chart);
 
+    // per-project breakdown
+    const rows = state.projects.map((p) => projStats(p.id, p.name, p.color))
+      .concat([projStats(null, "No project", "var(--faint)")])
+      .filter((r) => r.total > 0)
+      .sort((a, b) => b.total - a.total);
+    if (rows.length) {
+      const pj = document.createElement("div"); pj.className = "panel-card";
+      pj.innerHTML = "<h3>By project</h3>";
+      const maxTotal = Math.max(1, ...rows.map((r) => r.total));
+      rows.forEach((r) => {
+        const pct = Math.round((r.done / r.total) * 100);
+        const row = document.createElement("div"); row.style.cssText = "margin-bottom:14px";
+        row.innerHTML =
+          '<div style="display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:6px">' +
+            '<span style="width:9px;height:9px;border-radius:50%;background:' + r.color + '"></span>' +
+            '<b>' + esc(r.name) + "</b>" +
+            '<span style="margin-left:auto;color:var(--muted)">' + r.done + "/" + r.total + " done · " + r.focus + "m focus</span></div>" +
+          '<div style="height:8px;border-radius:5px;background:var(--panel-2);overflow:hidden">' +
+            '<div style="height:100%;width:' + pct + '%;background:linear-gradient(90deg,var(--accent),var(--accent-2))"></div></div>';
+        pj.appendChild(row);
+      });
+      root.appendChild(pj);
+    }
+
     const foc = document.createElement("div"); foc.className = "panel-card";
     foc.innerHTML = "<h3>Focus time</h3><div style='color:var(--muted);font-size:14px'>You've logged <b style='color:var(--text)'>" +
       focusTotal + " minutes</b> of focused work across " + state.focusLog.length + " sessions. " +
@@ -766,6 +895,11 @@
     root.appendChild(foc);
   }
   function statCard(k, v) { return '<div class="stat-card"><div class="k">' + k + '</div><div class="v">' + v + "</div></div>"; }
+  function projStats(pid, name, color) {
+    const ts = state.tasks.filter((t) => (t.projectId || null) === pid);
+    return { name, color, total: ts.length, done: ts.filter((t) => t.done).length,
+      focus: Math.round(ts.reduce((s, t) => s + (t.focusSeconds || 0), 0) / 60) };
+  }
   function focusMinutesOn(k) { return Math.round(state.focusLog.filter((f) => f.date === k).reduce((s, f) => s + f.seconds, 0) / 60); }
   function computeStreak() {
     const set = new Set(state.tasks.filter((t) => t.done && t.completedAt).map((t) => key(new Date(t.completedAt))));
@@ -790,12 +924,15 @@
     $("#quickadd").style.display = (currentView === "analytics") ? "none" : "block";
 
     const root = $("#content"); root.innerHTML = "";
+    if (currentView === "board" || currentView === "week" || currentView === "analytics") { selectMode = false; selected.clear(); }
+    updateBulkBar();
     if (currentView === "board") return void renderBoard(root);
     if (currentView === "week") return void renderWeek(root);
     if (currentView === "analytics") return void renderAnalytics(root);
 
     const tasks = applyListOpts(viewTasks());
     renderListControls(root);
+    renderTemplateBar(root);
     if (!tasks.length) {
       const emptyEl = document.createElement("div"); emptyEl.className = "empty";
       emptyEl.innerHTML = '<div class="big">' + (currentView === "completed" ? "🗃️" : "🌱") + '</div><div class="msg">' +
@@ -819,6 +956,43 @@
     }
   }
   function addGroup(root, label) { const g = document.createElement("div"); g.className = "group-label"; g.innerHTML = esc(label) + '<span class="line"></span>'; root.appendChild(g); }
+
+  function renderTemplateBar(root) {
+    if (selectMode || !state.templates.length) return;
+    const bar = document.createElement("div"); bar.className = "tpl-bar";
+    bar.innerHTML = '<span class="tpl-lbl">Templates</span>';
+    state.templates.forEach((tp) => {
+      const chip = document.createElement("div"); chip.className = "tpl-chip";
+      chip.innerHTML = "＋ " + esc(tp.name) + ' <span class="tpl-x" title="Delete template">✕</span>';
+      chip.onclick = (e) => { if (e.target.classList.contains("tpl-x")) return; createFromTemplate(tp.id); };
+      $(".tpl-x", chip).onclick = (e) => { e.stopPropagation(); delTemplate(tp.id); };
+      bar.appendChild(chip);
+    });
+    root.appendChild(bar);
+  }
+
+  function updateBulkBar() {
+    const old = $("#bulkBar"); if (old) old.remove();
+    if (!selectMode || !selected.size) return;
+    const bar = document.createElement("div"); bar.className = "bulk-bar"; bar.id = "bulkBar";
+    const prioSel = '<select id="bulk-prio"><option value="">Priority…</option>' + [1,2,3,4].map((p) => '<option value="' + p + '">Set P' + p + "</option>").join("") + "</select>";
+    bar.innerHTML =
+      '<span class="bcount">' + selected.size + " selected</span><span class=\"bsep\"></span>" +
+      '<button id="bulk-done">✓ Complete</button>' +
+      '<button id="bulk-today">🗓 Today</button>' +
+      '<button id="bulk-tom">Tomorrow</button>' +
+      '<button id="bulk-cleardue">Clear date</button>' + prioSel +
+      '<span class="bsep"></span><button id="bulk-del" class="danger">🗑 Delete</button>' +
+      '<button id="bulk-cancel">Cancel</button>';
+    document.body.appendChild(bar);
+    $("#bulk-done", bar).onclick = () => bulkApply((t) => { t.done = true; t.status = "done"; t.completedAt = t.completedAt || Date.now(); }, "Completed");
+    $("#bulk-today", bar).onclick = () => bulkApply((t) => { t.due = todayKey(); }, "Rescheduled to today");
+    $("#bulk-tom", bar).onclick = () => bulkApply((t) => { t.due = tomorrowKey(); }, "Rescheduled to tomorrow");
+    $("#bulk-cleardue", bar).onclick = () => bulkApply((t) => { t.due = null; }, "Dates cleared");
+    $("#bulk-prio", bar).onchange = (e) => { if (e.target.value) bulkApply((t) => { t.priority = +e.target.value; }, "Priority set"); };
+    $("#bulk-del", bar).onclick = () => bulkDelete();
+    $("#bulk-cancel", bar).onclick = () => { selectMode = false; selected.clear(); render(); };
+  }
 
   function renderNav() { $$("#nav button").forEach((b) => b.classList.toggle("active", b.dataset.view === currentView && !state.settings.project)); }
   function renderProjects() {

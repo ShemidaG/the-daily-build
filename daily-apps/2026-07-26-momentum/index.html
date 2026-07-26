@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Momentum — Productivity Command Center</title>
+<style>
+  :root {
+    --bg: #0e1020; --bg-2: #141733; --panel: #191d3d; --panel-2: #20244a; --panel-3: #272c58;
+    --ring: #2c3162; --ring-2: #383e78; --text: #eef0ff; --muted: #9096c8; --faint: #6b70a0;
+    --accent: #6c7dff; --accent-2: #46e0c8; --shadow: 0 24px 60px -30px rgba(0,0,0,.75);
+    --p1: #ff5f6d; --p2: #ffab3d; --p3: #4db2ff; --p4: #7a80b0; --ok: #46e0c8; --warn: #ff5f6d;
+  }
+  [data-theme="light"] {
+    --bg: #eef1fb; --bg-2: #e6eaf7; --panel: #ffffff; --panel-2: #f2f4fd; --panel-3: #e9ecfa;
+    --ring: #dde1f4; --ring-2: #cbd1ee; --text: #191d3d; --muted: #5c6398; --faint: #8b91be;
+    --accent: #5566e6; --accent-2: #12b5a0; --shadow: 0 24px 60px -34px rgba(50,60,130,.35);
+    --p4: #9096c0;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg); color: var(--text); display: grid; grid-template-columns: 260px 1fr; height: 100vh;
+    overflow: hidden; transition: background .3s ease, color .3s ease;
+  }
+  button, input, select, textarea { font-family: inherit; color: inherit; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: var(--ring); border-radius: 6px; }
+
+  /* ---------- Sidebar ---------- */
+  .sidebar { background: var(--bg-2); border-right: 1px solid var(--ring); display: flex; flex-direction: column; min-height: 0; }
+  .brand { display: flex; align-items: center; gap: 11px; padding: 20px 20px 16px; font-weight: 800; font-size: 19px; }
+  .brand .logo { width: 30px; height: 30px; border-radius: 9px; background: linear-gradient(135deg, var(--accent), var(--accent-2)); box-shadow: 0 6px 18px -6px var(--accent); }
+  .nav { padding: 4px 12px; display: flex; flex-direction: column; gap: 2px; }
+  .nav button {
+    display: flex; align-items: center; gap: 11px; width: 100%; text-align: left; border: none; background: transparent;
+    color: var(--muted); padding: 10px 12px; border-radius: 10px; cursor: pointer; font-size: 14px; font-weight: 600;
+    transition: background .15s ease, color .15s ease;
+  }
+  .nav button:hover { background: var(--panel-2); color: var(--text); }
+  .nav button.active { background: var(--accent); color: #fff; }
+  .nav button .badge { margin-left: auto; background: var(--panel-3); color: var(--muted); font-size: 11px; padding: 1px 8px; border-radius: 999px; font-weight: 700; }
+  .nav button.active .badge { background: rgba(255,255,255,.25); color: #fff; }
+  .nav .ico { width: 18px; text-align: center; font-size: 15px; }
+
+  .side-section { padding: 14px 20px 6px; font-size: 11px; letter-spacing: 1.4px; text-transform: uppercase; color: var(--faint); font-weight: 700; display: flex; justify-content: space-between; align-items: center; }
+  .side-section span.add { cursor: pointer; font-size: 15px; color: var(--muted); }
+  .side-section span.add:hover { color: var(--accent-2); }
+  .projects { padding: 0 12px; display: flex; flex-direction: column; gap: 1px; overflow-y: auto; flex: 1; min-height: 40px; }
+  .proj {
+    display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 9px; cursor: pointer;
+    font-size: 13.5px; color: var(--muted); font-weight: 600;
+  }
+  .proj:hover { background: var(--panel-2); color: var(--text); }
+  .proj.active { background: var(--panel-2); color: var(--text); }
+  .proj .swatch { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .proj .cnt { margin-left: auto; font-size: 11px; color: var(--faint); }
+  .proj .x { margin-left: 6px; opacity: 0; color: var(--faint); }
+  .proj:hover .x { opacity: 1; }
+  .proj .x:hover { color: var(--warn); }
+  .proj-add { padding: 8px 12px; }
+  .proj-add input { width: 100%; background: var(--panel); border: 1px solid var(--ring); border-radius: 8px; padding: 8px 10px; font-size: 13px; outline: none; }
+  .proj-add input:focus { border-color: var(--accent); }
+
+  /* ---------- Focus widget ---------- */
+  .focus-widget { border-top: 1px solid var(--ring); padding: 14px 16px; background: var(--bg-2); }
+  .fw-task { font-size: 12px; color: var(--muted); margin-bottom: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .fw-task b { color: var(--text); }
+  .fw-main { display: flex; align-items: center; gap: 10px; }
+  .fw-time { font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: 1px; }
+  .fw-btn { border: none; border-radius: 9px; background: var(--panel-2); color: var(--text); cursor: pointer; padding: 8px 10px; font-size: 13px; font-weight: 700; }
+  .fw-btn.play { background: linear-gradient(135deg, var(--accent-2), var(--accent)); color: #06121a; }
+  .fw-btn:active { transform: scale(.95); }
+  .fw-modes { display: flex; gap: 5px; margin-top: 8px; }
+  .fw-modes button { flex: 1; border: 1px solid var(--ring); background: transparent; color: var(--muted); border-radius: 7px; padding: 4px; font-size: 11px; cursor: pointer; font-weight: 600; }
+  .fw-modes button.on { background: var(--panel-2); color: var(--text); border-color: var(--ring-2); }
+
+  /* ---------- Main ---------- */
+  .main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  .topbar { display: flex; align-items: center; gap: 14px; padding: 18px 26px 14px; border-bottom: 1px solid var(--ring); }
+  .view-title { font-size: 22px; font-weight: 800; letter-spacing: -.3px; }
+  .view-sub { font-size: 13px; color: var(--muted); margin-top: 2px; }
+  .top-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .search { position: relative; }
+  .search input { background: var(--panel); border: 1px solid var(--ring); border-radius: 10px; padding: 9px 12px 9px 32px; font-size: 13px; width: 200px; outline: none; transition: border-color .2s, width .2s; }
+  .search input:focus { border-color: var(--accent); width: 240px; }
+  .search .mag { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--faint); font-size: 13px; }
+  .icon-btn { width: 38px; height: 38px; border-radius: 10px; border: 1px solid var(--ring); background: var(--panel); cursor: pointer; font-size: 16px; transition: border-color .2s, transform .12s; }
+  .icon-btn:hover { border-color: var(--accent); } .icon-btn:active { transform: scale(.94); }
+
+  .quickadd { padding: 14px 26px; border-bottom: 1px solid var(--ring); }
+  .qa-wrap { display: flex; gap: 10px; align-items: center; background: var(--panel); border: 1px solid var(--ring); border-radius: 12px; padding: 4px 4px 4px 14px; transition: border-color .2s; }
+  .qa-wrap:focus-within { border-color: var(--accent); }
+  .qa-wrap .plus { color: var(--accent-2); font-size: 20px; font-weight: 700; }
+  .qa-wrap input { flex: 1; border: none; background: transparent; font-size: 14.5px; outline: none; padding: 10px 0; }
+  .qa-wrap button { border: none; background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; font-weight: 700; padding: 10px 20px; border-radius: 9px; cursor: pointer; font-size: 14px; }
+  .qa-hint { font-size: 11.5px; color: var(--faint); margin-top: 8px; padding-left: 4px; }
+  .qa-hint code { background: var(--panel-2); padding: 1px 6px; border-radius: 5px; color: var(--muted); }
+
+  .content { flex: 1; overflow-y: auto; padding: 18px 26px 60px; }
+
+  /* ---------- Task list ---------- */
+  .group-label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--faint); margin: 20px 2px 10px; display: flex; align-items: center; gap: 8px; }
+  .group-label:first-child { margin-top: 4px; }
+  .group-label .line { flex: 1; height: 1px; background: var(--ring); }
+  .task { background: var(--panel); border: 1px solid var(--ring); border-radius: 12px; margin-bottom: 9px; transition: border-color .15s, box-shadow .15s; overflow: hidden; }
+  .task:hover { border-color: var(--ring-2); }
+  .task.pdone .t-title { text-decoration: line-through; color: var(--faint); }
+  .t-row { display: flex; align-items: center; gap: 12px; padding: 13px 15px; }
+  .t-check { width: 22px; height: 22px; border-radius: 7px; border: 2px solid var(--ring-2); flex-shrink: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 13px; color: transparent; transition: all .15s; }
+  .t-check:hover { border-color: var(--ok); }
+  .task.pdone .t-check { background: var(--ok); border-color: var(--ok); color: #052; }
+  .t-flag { width: 4px; height: 34px; border-radius: 3px; flex-shrink: 0; }
+  .t-body { flex: 1; min-width: 0; cursor: pointer; }
+  .t-title { font-size: 14.5px; font-weight: 600; word-break: break-word; }
+  .t-meta { display: flex; align-items: center; gap: 8px; margin-top: 5px; flex-wrap: wrap; }
+  .chip { font-size: 11px; padding: 2px 8px; border-radius: 999px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; }
+  .chip.proj { background: var(--panel-3); color: var(--muted); }
+  .chip.due { background: var(--panel-2); color: var(--muted); }
+  .chip.due.over { background: rgba(255,95,109,.16); color: var(--warn); }
+  .chip.due.today { background: rgba(70,224,200,.16); color: var(--ok); }
+  .chip.tag { background: transparent; color: var(--faint); border: 1px solid var(--ring); }
+  .chip.sub { background: var(--panel-2); color: var(--muted); }
+  .chip.foc { background: var(--panel-2); color: var(--accent-2); }
+  .t-actions { display: flex; gap: 4px; opacity: 0; transition: opacity .15s; }
+  .task:hover .t-actions { opacity: 1; }
+  .t-actions button { border: none; background: transparent; color: var(--faint); cursor: pointer; font-size: 15px; padding: 5px 7px; border-radius: 7px; }
+  .t-actions button:hover { background: var(--panel-2); color: var(--text); }
+  .t-actions button.focusing { color: var(--accent-2); }
+
+  /* ---------- Expanded editor ---------- */
+  .t-edit { border-top: 1px solid var(--ring); padding: 14px 15px; background: var(--panel-2); display: none; }
+  .task.open .t-edit { display: block; }
+  .edit-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 12px; }
+  .field label { font-size: 11px; color: var(--muted); font-weight: 700; display: block; margin-bottom: 4px; text-transform: uppercase; letter-spacing: .5px; }
+  .field input, .field select { width: 100%; background: var(--panel); border: 1px solid var(--ring); border-radius: 8px; padding: 8px 10px; font-size: 13px; outline: none; }
+  .field input:focus, .field select:focus { border-color: var(--accent); }
+  .notes { width: 100%; background: var(--panel); border: 1px solid var(--ring); border-radius: 8px; padding: 10px; font-size: 13px; outline: none; resize: vertical; min-height: 54px; margin-bottom: 12px; }
+  .notes:focus { border-color: var(--accent); }
+  .subs { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+  .sub-item { display: flex; align-items: center; gap: 9px; font-size: 13px; }
+  .sub-item .sc { width: 17px; height: 17px; border-radius: 5px; border: 2px solid var(--ring-2); cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 11px; color: transparent; }
+  .sub-item.done .sc { background: var(--ok); border-color: var(--ok); color: #052; }
+  .sub-item.done span { text-decoration: line-through; color: var(--faint); }
+  .sub-item span { flex: 1; }
+  .sub-item .srm { color: var(--faint); cursor: pointer; opacity: 0; }
+  .sub-item:hover .srm { opacity: 1; }
+  .sub-add { display: flex; gap: 8px; }
+  .sub-add input { flex: 1; background: var(--panel); border: 1px solid var(--ring); border-radius: 8px; padding: 7px 10px; font-size: 13px; outline: none; }
+  .sub-add button { border: 1px solid var(--ring); background: var(--panel); border-radius: 8px; padding: 7px 12px; cursor: pointer; font-size: 13px; font-weight: 600; }
+
+  /* ---------- Board ---------- */
+  .board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; align-items: start; }
+  .col { background: var(--bg-2); border: 1px solid var(--ring); border-radius: 14px; padding: 12px; min-height: 120px; }
+  .col.drag-over { border-color: var(--accent); background: var(--panel-2); }
+  .col-head { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; margin-bottom: 12px; padding: 0 4px; }
+  .col-head .dotc { width: 9px; height: 9px; border-radius: 50%; }
+  .col-head .cnt { margin-left: auto; color: var(--faint); font-size: 12px; }
+  .bcard { background: var(--panel); border: 1px solid var(--ring); border-radius: 10px; padding: 11px 12px; margin-bottom: 9px; cursor: grab; border-left: 3px solid var(--p4); }
+  .bcard:active { cursor: grabbing; }
+  .bcard.dragging { opacity: .4; }
+  .bcard .bt { font-size: 13.5px; font-weight: 600; word-break: break-word; }
+  .bcard .bm { display: flex; gap: 6px; margin-top: 7px; flex-wrap: wrap; }
+
+  /* ---------- Analytics ---------- */
+  .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 22px; }
+  .stat-card { background: var(--panel); border: 1px solid var(--ring); border-radius: 14px; padding: 18px; }
+  .stat-card .k { font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .8px; }
+  .stat-card .v { font-size: 32px; font-weight: 800; margin-top: 6px; }
+  .stat-card .v small { font-size: 15px; color: var(--muted); font-weight: 600; }
+  .panel-card { background: var(--panel); border: 1px solid var(--ring); border-radius: 14px; padding: 20px; margin-bottom: 18px; }
+  .panel-card h3 { font-size: 15px; margin-bottom: 18px; }
+  .chart { display: flex; align-items: flex-end; gap: 12px; height: 180px; padding-top: 10px; }
+  .bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 8px; height: 100%; justify-content: flex-end; }
+  .bar { width: 100%; max-width: 44px; border-radius: 8px 8px 4px 4px; background: linear-gradient(180deg, var(--accent), var(--accent-2)); min-height: 3px; transition: height .4s ease; position: relative; }
+  .bar .num { position: absolute; top: -20px; left: 50%; transform: translateX(-50%); font-size: 12px; font-weight: 700; color: var(--muted); }
+  .bar-lbl { font-size: 11px; color: var(--faint); font-weight: 600; }
+
+  .empty { text-align: center; color: var(--faint); padding: 60px 20px; }
+  .empty .big { font-size: 40px; margin-bottom: 12px; }
+  .empty .msg { font-size: 15px; }
+
+  .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--text); color: var(--bg); padding: 11px 20px; border-radius: 999px; font-size: 13px; font-weight: 700; opacity: 0; pointer-events: none; transition: all .25s; box-shadow: var(--shadow); z-index: 50; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  @media (max-width: 860px) {
+    body { grid-template-columns: 1fr; }
+    .sidebar { position: fixed; z-index: 40; width: 260px; height: 100%; transform: translateX(-100%); transition: transform .25s; }
+    .sidebar.show { transform: translateX(0); box-shadow: var(--shadow); }
+    .menu-btn { display: inline-block !important; }
+    .edit-grid { grid-template-columns: 1fr; }
+    .stats-row { grid-template-columns: repeat(2, 1fr); }
+    .board { grid-template-columns: 1fr; }
+    .search input { width: 130px; } .search input:focus { width: 150px; }
+  }
+  .menu-btn { display: none; }
+</style>
+</head>
+<body data-theme="dark">
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="brand"><span class="logo"></span> Momentum</div>
+    <nav class="nav" id="nav">
+      <button data-view="today"><span class="ico">☀️</span> Today <span class="badge" id="b-today">0</span></button>
+      <button data-view="upcoming"><span class="ico">🗓️</span> Upcoming <span class="badge" id="b-up">0</span></button>
+      <button data-view="all"><span class="ico">🗂️</span> All Tasks <span class="badge" id="b-all">0</span></button>
+      <button data-view="board"><span class="ico">📋</span> Board</button>
+      <button data-view="analytics"><span class="ico">📊</span> Analytics</button>
+      <button data-view="completed"><span class="ico">✅</span> Completed <span class="badge" id="b-done">0</span></button>
+    </nav>
+    <div class="side-section">Projects <span class="add" id="projAddBtn" title="Add project">＋</span></div>
+    <div class="proj-add" id="projAddWrap" style="display:none">
+      <input id="projInput" placeholder="Project name, Enter to add" maxlength="40" />
+    </div>
+    <div class="projects" id="projects"></div>
+    <div class="focus-widget">
+      <div class="fw-task" id="fwTask">Focus: <b>no task selected</b></div>
+      <div class="fw-main">
+        <div class="fw-time" id="fwTime">25:00</div>
+        <button class="fw-btn play" id="fwPlay">Start</button>
+        <button class="fw-btn" id="fwReset">↺</button>
+      </div>
+      <div class="fw-modes" id="fwModes">
+        <button data-min="25" class="on">Focus 25</button>
+        <button data-min="5">Break 5</button>
+        <button data-min="15">Long 15</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+    <div class="topbar">
+      <button class="icon-btn menu-btn" id="menuBtn">☰</button>
+      <div>
+        <div class="view-title" id="viewTitle">Today</div>
+        <div class="view-sub" id="viewSub"></div>
+      </div>
+      <div class="top-actions">
+        <div class="search"><span class="mag">🔍</span><input id="search" placeholder="Search tasks…" /></div>
+        <button class="icon-btn" id="exportBtn" title="Export JSON">⬇︎</button>
+        <button class="icon-btn" id="importBtn" title="Import JSON">⬆︎</button>
+        <button class="icon-btn" id="themeBtn" title="Toggle theme">🌙</button>
+        <input type="file" id="fileInput" accept="application/json" style="display:none" />
+      </div>
+    </div>
+    <div class="quickadd" id="quickadd">
+      <div class="qa-wrap">
+        <span class="plus">＋</span>
+        <input id="qaInput" placeholder="Add a task…  e.g.  Draft Q3 report !p1 #Work @deep tomorrow" />
+        <button id="qaBtn">Add</button>
+      </div>
+      <div class="qa-hint">
+        <code>!p1</code>–<code>!p4</code> priority · <code>#Project</code> · <code>@tag</code> ·
+        <code>today</code> / <code>tomorrow</code> / <code>fri</code> / <code>2026-08-01</code> due date
+      </div>
+    </div>
+    <div class="content" id="content"></div>
+  </main>
+
+  <div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  "use strict";
+  const $ = (s, r) => (r || document).querySelector(s);
+  const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  const PROJ_COLORS = ["#6c7dff","#46e0c8","#ff5f6d","#ffab3d","#b06bff","#4db2ff","#ff8fce","#7ee08f"];
+  const P_COLORS = { 1: "var(--p1)", 2: "var(--p2)", 3: "var(--p3)", 4: "var(--p4)" };
+
+  // ---------- state ----------
+  const DEFAULT = { version: 1, projects: [], tasks: [], focusLog: [], activeTaskId: null,
+                    settings: { theme: "dark", view: "today", project: null } };
+  let state = load();
+  function load() {
+    try { const s = JSON.parse(localStorage.getItem("momentum")); if (s && s.tasks) return Object.assign({}, DEFAULT, s); }
+    catch (e) {}
+    // seed a friendly first-run example
+    const pid = uid();
+    return { version: 1, activeTaskId: null, focusLog: [],
+      projects: [{ id: pid, name: "Getting Started", color: PROJ_COLORS[0] }],
+      settings: { theme: "dark", view: "today", project: null },
+      tasks: [
+        mkTask("Welcome to Momentum — click me to open details", { priority: 2, projectId: pid, due: todayKey(),
+          notes: "Momentum is your command center: projects, priorities, due dates, subtasks, a focus timer, and analytics.\n\nTry the quick-add above with !p1, #Project, @tag and a due date like 'tomorrow'.",
+          subtasks: [ sub("Add your first real task", true), sub("Press ▶ Start on the focus timer", false), sub("Check the Analytics tab", false) ] }),
+        mkTask("Plan the week's top 3 priorities", { priority: 1, projectId: pid, due: todayKey() }),
+        mkTask("Review inbox and clear to zero", { priority: 3, projectId: pid, due: tomorrowKey() }),
+      ] };
+  }
+  function save() { localStorage.setItem("momentum", JSON.stringify(state)); }
+  function sub(title, done) { return { id: uid(), title, done: !!done }; }
+  function mkTask(title, o) {
+    o = o || {};
+    return { id: uid(), title, notes: o.notes || "", priority: o.priority || 4, due: o.due || null,
+      projectId: o.projectId || null, tags: o.tags || [], subtasks: o.subtasks || [],
+      status: o.status || "todo", done: false, createdAt: Date.now(), completedAt: null, focusSeconds: 0 };
+  }
+
+  // ---------- dates ----------
+  function key(d) { return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
+  function todayKey() { return key(new Date()); }
+  function tomorrowKey() { const d = new Date(); d.setDate(d.getDate() + 1); return key(d); }
+  function addDays(base, n) { const d = new Date(base); d.setDate(d.getDate() + n); return d; }
+  function parseKey(k) { const [y, m, dd] = k.split("-").map(Number); return new Date(y, m - 1, dd); }
+  function fmtDue(k) {
+    if (!k) return "";
+    const t = todayKey(), tm = tomorrowKey();
+    if (k === t) return "Today";
+    if (k === tm) return "Tomorrow";
+    const d = parseKey(k), now = new Date(); now.setHours(0,0,0,0);
+    const diff = Math.round((d - now) / 86400000);
+    if (diff < 0) return Math.abs(diff) + "d overdue";
+    const opts = { month: "short", day: "numeric" };
+    return d.toLocaleDateString(undefined, opts);
+  }
+  const WEEKDAYS = ["sun","mon","tue","wed","thu","fri","sat"];
+
+  // ---------- quick-add parser ----------
+  function parseQuick(raw) {
+    let text = raw.trim(); const out = { priority: 4, projectId: null, tags: [], due: null };
+    text = text.replace(/(?:^|\s)!?p([1-4])\b/gi, (m, p) => { out.priority = +p; return " "; });
+    text = text.replace(/(?:^|\s)#([\w-]+)/g, (m, name) => {
+      let pj = state.projects.find((p) => p.name.toLowerCase() === name.toLowerCase());
+      if (!pj) { pj = { id: uid(), name: name, color: PROJ_COLORS[state.projects.length % PROJ_COLORS.length] }; state.projects.push(pj); }
+      out.projectId = pj.id; return " ";
+    });
+    text = text.replace(/(?:^|\s)@([\w-]+)/g, (m, t) => { out.tags.push(t); return " "; });
+    // explicit date YYYY-MM-DD
+    text = text.replace(/\b(\d{4}-\d{2}-\d{2})\b/, (m, d) => { out.due = d; return " "; });
+    // keywords
+    if (!out.due) {
+      const lower = text.toLowerCase();
+      if (/\btoday\b/.test(lower)) { out.due = todayKey(); text = text.replace(/\btoday\b/i, " "); }
+      else if (/\btomorrow\b/.test(lower)) { out.due = tomorrowKey(); text = text.replace(/\btomorrow\b/i, " "); }
+      else {
+        for (let i = 0; i < 7; i++) {
+          const re = new RegExp("\\b" + WEEKDAYS[i] + "(?:day)?\\b", "i");
+          if (re.test(lower)) {
+            const now = new Date(); let delta = (i - now.getDay() + 7) % 7; if (delta === 0) delta = 7;
+            out.due = key(addDays(now, delta)); text = text.replace(re, " "); break;
+          }
+        }
+      }
+    }
+    out.title = text.replace(/\s+/g, " ").trim();
+    return out;
+  }
+
+  // ---------- mutations ----------
+  function addTask(raw) {
+    const p = parseQuick(raw); if (!p.title) return;
+    state.tasks.unshift(mkTask(p.title, p));
+    save(); render();
+  }
+  function toggleDone(id) {
+    const t = state.tasks.find((x) => x.id === id); if (!t) return;
+    t.done = !t.done; t.status = t.done ? "done" : "todo"; t.completedAt = t.done ? Date.now() : null;
+    if (t.done) toast("Task completed 🎉");
+    save(); render();
+  }
+  function delTask(id) { state.tasks = state.tasks.filter((x) => x.id !== id); if (state.activeTaskId === id) state.activeTaskId = null; save(); render(); }
+  function updTask(id, patch) { const t = state.tasks.find((x) => x.id === id); if (t) Object.assign(t, patch); save(); }
+
+  // ---------- rendering ----------
+  let currentView = state.settings.view || "today";
+  let openTaskId = null;
+  let searchQ = "";
+
+  function activeTasks() { return state.tasks.filter((t) => !t.done); }
+  function projById(id) { return state.projects.find((p) => p.id === id); }
+
+  function matchesSearch(t) {
+    if (!searchQ) return true;
+    const q = searchQ.toLowerCase();
+    const pj = projById(t.projectId);
+    return t.title.toLowerCase().includes(q) || (t.notes || "").toLowerCase().includes(q) ||
+      t.tags.some((x) => x.toLowerCase().includes(q)) || (pj && pj.name.toLowerCase().includes(q));
+  }
+
+  function viewTasks() {
+    let list = state.tasks.filter(matchesSearch);
+    if (state.settings.project) list = list.filter((t) => t.projectId === state.settings.project);
+    const t = todayKey();
+    if (currentView === "today") return list.filter((x) => !x.done && x.due && x.due <= t);
+    if (currentView === "upcoming") { const max = key(addDays(new Date(), 7)); return list.filter((x) => !x.done && x.due && x.due > t && x.due <= max); }
+    if (currentView === "all") return list.filter((x) => !x.done);
+    if (currentView === "completed") return list.filter((x) => x.done).sort((a, b) => b.completedAt - a.completedAt);
+    return list;
+  }
+
+  function updateCounts() {
+    const t = todayKey(), max = key(addDays(new Date(), 7));
+    const a = activeTasks();
+    $("#b-today").textContent = a.filter((x) => x.due && x.due <= t).length;
+    $("#b-up").textContent = a.filter((x) => x.due && x.due > t && x.due <= max).length;
+    $("#b-all").textContent = a.length;
+    $("#b-done").textContent = state.tasks.filter((x) => x.done).length;
+  }
+
+  function taskChips(t) {
+    let html = "";
+    const pj = projById(t.projectId);
+    if (pj) html += '<span class="chip proj"><span style="width:7px;height:7px;border-radius:50%;background:' + pj.color + ';display:inline-block"></span>' + esc(pj.name) + "</span>";
+    if (t.due) { const cls = t.due < todayKey() ? " over" : (t.due === todayKey() ? " today" : ""); html += '<span class="chip due' + cls + '">🗓 ' + fmtDue(t.due) + "</span>"; }
+    const sc = t.subtasks.length; if (sc) { const dn = t.subtasks.filter((s) => s.done).length; html += '<span class="chip sub">☑ ' + dn + "/" + sc + "</span>"; }
+    if (t.focusSeconds > 60) html += '<span class="chip foc">⏱ ' + Math.round(t.focusSeconds / 60) + "m</span>";
+    t.tags.forEach((tg) => html += '<span class="chip tag">#' + esc(tg) + "</span>");
+    return html;
+  }
+  function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+
+  function renderTaskItem(t) {
+    const el = document.createElement("div");
+    el.className = "task" + (t.done ? " pdone" : "") + (openTaskId === t.id ? " open" : "");
+    el.innerHTML =
+      '<div class="t-row">' +
+        '<div class="t-check" data-act="done"></div>' +
+        '<div class="t-flag" style="background:' + P_COLORS[t.priority] + '"></div>' +
+        '<div class="t-body" data-act="open"><div class="t-title">' + esc(t.title) + '</div>' +
+          (t.subtasks.length || t.due || t.projectId || t.tags.length || t.focusSeconds > 60 ? '<div class="t-meta">' + taskChips(t) + "</div>" : "") +
+        "</div>" +
+        '<div class="t-actions">' +
+          '<button data-act="focus" class="' + (state.activeTaskId === t.id ? "focusing" : "") + '" title="Set as focus task">⏱</button>' +
+          '<button data-act="open" title="Edit">✏️</button>' +
+          '<button data-act="del" title="Delete">🗑</button>' +
+        "</div>" +
+      "</div>" + editorHtml(t);
+    // events
+    $("[data-act=done]", el).onclick = () => toggleDone(t.id);
+    $$(".t-body,[data-act=open]", el).forEach((b) => b.onclick = () => { openTaskId = openTaskId === t.id ? null : t.id; render(); });
+    $("[data-act=focus]", el).onclick = (e) => { e.stopPropagation(); state.activeTaskId = t.id; save(); updateFocusWidget(); render(); toast("Focus task set"); };
+    $("[data-act=del]", el).onclick = (e) => { e.stopPropagation(); delTask(t.id); };
+    if (openTaskId === t.id) wireEditor(el, t);
+    return el;
+  }
+
+  function editorHtml(t) {
+    if (openTaskId !== t.id) return "";
+    const projOpts = ['<option value="">No project</option>'].concat(
+      state.projects.map((p) => '<option value="' + p.id + '"' + (p.id === t.projectId ? " selected" : "") + ">" + esc(p.name) + "</option>")).join("");
+    const prioOpts = [1,2,3,4].map((p) => '<option value="' + p + '"' + (p === t.priority ? " selected" : "") + ">P" + p + "</option>").join("");
+    let subs = t.subtasks.map((s) =>
+      '<div class="sub-item ' + (s.done ? "done" : "") + '" data-sid="' + s.id + '">' +
+      '<div class="sc" data-sact="toggle"></div><span>' + esc(s.title) + "</span>" +
+      '<span class="srm" data-sact="rm">✕</span></div>').join("");
+    return '<div class="t-edit">' +
+      '<div class="edit-grid">' +
+        '<div class="field"><label>Due date</label><input type="date" data-ed="due" value="' + (t.due || "") + '"></div>' +
+        '<div class="field"><label>Priority</label><select data-ed="priority">' + prioOpts + "</select></div>" +
+        '<div class="field"><label>Project</label><select data-ed="project">' + projOpts + "</select></div>" +
+      "</div>" +
+      '<textarea class="notes" data-ed="notes" placeholder="Notes…">' + esc(t.notes || "") + "</textarea>" +
+      '<div class="subs">' + subs + "</div>" +
+      '<div class="sub-add"><input data-ed="subnew" placeholder="Add a subtask…"><button data-ed="subadd">Add step</button></div>' +
+    "</div>";
+  }
+
+  function wireEditor(el, t) {
+    $("[data-ed=due]", el).onchange = (e) => { updTask(t.id, { due: e.target.value || null }); softRefresh(); };
+    $("[data-ed=priority]", el).onchange = (e) => { updTask(t.id, { priority: +e.target.value }); softRefresh(); };
+    $("[data-ed=project]", el).onchange = (e) => { updTask(t.id, { projectId: e.target.value || null }); softRefresh(); };
+    $("[data-ed=notes]", el).onblur = (e) => updTask(t.id, { notes: e.target.value });
+    const addSub = () => { const inp = $("[data-ed=subnew]", el); const v = inp.value.trim(); if (!v) return; t.subtasks.push(sub(v, false)); save(); render(); };
+    $("[data-ed=subadd]", el).onclick = addSub;
+    $("[data-ed=subnew]", el).onkeydown = (e) => { if (e.key === "Enter") addSub(); };
+    $$(".sub-item", el).forEach((si) => {
+      const sid = si.dataset.sid; const s = t.subtasks.find((x) => x.id === sid);
+      $("[data-sact=toggle]", si).onclick = () => { s.done = !s.done; save(); render(); };
+      $("[data-sact=rm]", si).onclick = () => { t.subtasks = t.subtasks.filter((x) => x.id !== sid); save(); render(); };
+    });
+  }
+  function softRefresh() { updateCounts(); renderProjects(); }
+
+  // ---------- board ----------
+  const COLS = [ { id: "todo", name: "To Do", color: "var(--p3)" }, { id: "doing", name: "In Progress", color: "var(--p2)" }, { id: "done", name: "Done", color: "var(--ok)" } ];
+  function renderBoard(root) {
+    const wrap = document.createElement("div"); wrap.className = "board";
+    let list = state.tasks.filter(matchesSearch);
+    if (state.settings.project) list = list.filter((t) => t.projectId === state.settings.project);
+    COLS.forEach((col) => {
+      const items = list.filter((t) => (t.status || (t.done ? "done" : "todo")) === col.id);
+      const cEl = document.createElement("div"); cEl.className = "col"; cEl.dataset.col = col.id;
+      cEl.innerHTML = '<div class="col-head"><span class="dotc" style="background:' + col.color + '"></span>' + col.name + '<span class="cnt">' + items.length + "</span></div>";
+      items.forEach((t) => {
+        const c = document.createElement("div"); c.className = "bcard"; c.draggable = true; c.dataset.id = t.id;
+        c.style.borderLeftColor = P_COLORS[t.priority];
+        c.innerHTML = '<div class="bt">' + esc(t.title) + '</div>' + (taskChips(t) ? '<div class="bm">' + taskChips(t) + "</div>" : "");
+        c.addEventListener("dragstart", (e) => { c.classList.add("dragging"); e.dataTransfer.setData("text/plain", t.id); });
+        c.addEventListener("dragend", () => c.classList.remove("dragging"));
+        cEl.appendChild(c);
+      });
+      cEl.addEventListener("dragover", (e) => { e.preventDefault(); cEl.classList.add("drag-over"); });
+      cEl.addEventListener("dragleave", () => cEl.classList.remove("drag-over"));
+      cEl.addEventListener("drop", (e) => {
+        e.preventDefault(); cEl.classList.remove("drag-over");
+        const id = e.dataTransfer.getData("text/plain"); const t = state.tasks.find((x) => x.id === id); if (!t) return;
+        t.status = col.id; t.done = col.id === "done"; t.completedAt = t.done ? (t.completedAt || Date.now()) : null;
+        save(); render();
+      });
+      wrap.appendChild(cEl);
+    });
+    root.appendChild(wrap);
+  }
+
+  // ---------- analytics ----------
+  function renderAnalytics(root) {
+    const days = []; for (let i = 6; i >= 0; i--) days.push(addDays(new Date(), -i));
+    const doneByDay = days.map((d) => { const k = key(d); return state.tasks.filter((t) => t.done && t.completedAt && key(new Date(t.completedAt)) === k).length; });
+    const maxDone = Math.max(1, ...doneByDay);
+    const focusToday = focusMinutesOn(todayKey());
+    const focusTotal = Math.round(state.focusLog.reduce((s, f) => s + f.seconds, 0) / 60);
+    const open = activeTasks().length, done = state.tasks.filter((t) => t.done).length;
+    const rate = state.tasks.length ? Math.round((done / state.tasks.length) * 100) : 0;
+    const streak = computeStreak();
+
+    const stats = document.createElement("div"); stats.className = "stats-row";
+    stats.innerHTML =
+      statCard("Current Streak", streak + '<small> day' + (streak === 1 ? "" : "s") + "</small>") +
+      statCard("Focus Today", focusToday + '<small> min</small>') +
+      statCard("Completed", done + '<small> / ' + state.tasks.length + " total</small>") +
+      statCard("Completion Rate", rate + '<small>%</small>');
+    root.appendChild(stats);
+
+    const chart = document.createElement("div"); chart.className = "panel-card";
+    chart.innerHTML = "<h3>Tasks completed · last 7 days</h3>";
+    const c = document.createElement("div"); c.className = "chart";
+    days.forEach((d, i) => {
+      const col = document.createElement("div"); col.className = "bar-col";
+      const h = Math.round((doneByDay[i] / maxDone) * 150);
+      col.innerHTML = '<div class="bar" style="height:' + (doneByDay[i] ? h : 3) + 'px"><span class="num">' + (doneByDay[i] || "") + '</span></div>' +
+        '<div class="bar-lbl">' + d.toLocaleDateString(undefined, { weekday: "short" }) + "</div>";
+      c.appendChild(col);
+    });
+    chart.appendChild(c); root.appendChild(chart);
+
+    const foc = document.createElement("div"); foc.className = "panel-card";
+    foc.innerHTML = "<h3>Focus time</h3><div style='color:var(--muted);font-size:14px'>You've logged <b style='color:var(--text)'>" +
+      focusTotal + " minutes</b> of focused work across " + state.focusLog.length + " sessions. " +
+      "Pick a task, hit ▶ Start on the timer, and every completed session is banked here.</div>";
+    root.appendChild(foc);
+  }
+  function statCard(k, v) { return '<div class="stat-card"><div class="k">' + k + '</div><div class="v">' + v + "</div></div>"; }
+  function focusMinutesOn(k) { return Math.round(state.focusLog.filter((f) => f.date === k).reduce((s, f) => s + f.seconds, 0) / 60); }
+  function computeStreak() {
+    const set = new Set(state.tasks.filter((t) => t.done && t.completedAt).map((t) => key(new Date(t.completedAt))));
+    let streak = 0; let d = new Date();
+    if (!set.has(key(d))) d = addDays(d, -1);
+    while (set.has(key(d))) { streak++; d = addDays(d, -1); }
+    return streak;
+  }
+
+  // ---------- main render ----------
+  const TITLES = { today: ["Today", "Everything due today or overdue"], upcoming: ["Upcoming", "Due in the next 7 days"],
+    all: ["All Tasks", "Every open task"], board: ["Board", "Drag cards between columns"],
+    analytics: ["Analytics", "Your productivity at a glance"], completed: ["Completed", "Finished and archived"] };
+
+  function render() {
+    updateCounts(); renderProjects(); renderNav();
+    const [title, subFixed] = TITLES[currentView];
+    let sub = subFixed;
+    if (state.settings.project) { const p = projById(state.settings.project); if (p) sub += " · in " + p.name; }
+    $("#viewTitle").textContent = title; $("#viewSub").textContent = sub;
+    $("#quickadd").style.display = (currentView === "analytics") ? "none" : "block";
+
+    const root = $("#content"); root.innerHTML = "";
+    if (currentView === "board") return void renderBoard(root);
+    if (currentView === "analytics") return void renderAnalytics(root);
+
+    const tasks = viewTasks();
+    if (!tasks.length) {
+      root.innerHTML = '<div class="empty"><div class="big">' + (currentView === "completed" ? "🗃️" : "🌱") + '</div><div class="msg">' +
+        (searchQ ? "No tasks match your search." : currentView === "today" ? "Nothing due today. Add a task or enjoy the clear runway." :
+         currentView === "completed" ? "No completed tasks yet — go finish something!" : "No tasks here yet. Add one above.") + "</div></div>";
+      return;
+    }
+    if (currentView === "upcoming") {
+      const groups = {}; tasks.forEach((t) => { (groups[t.due] = groups[t.due] || []).push(t); });
+      Object.keys(groups).sort().forEach((k) => {
+        addGroup(root, fmtDue(k)); groups[k].forEach((t) => root.appendChild(renderTaskItem(t)));
+      });
+    } else if (currentView === "today") {
+      const over = tasks.filter((t) => t.due < todayKey()); const now = tasks.filter((t) => t.due === todayKey());
+      if (over.length) { addGroup(root, "Overdue"); over.forEach((t) => root.appendChild(renderTaskItem(t))); }
+      if (now.length) { addGroup(root, "Today"); now.forEach((t) => root.appendChild(renderTaskItem(t))); }
+    } else {
+      const byP = tasks.slice().sort((a, b) => a.priority - b.priority || (a.due || "9") .localeCompare(b.due || "9"));
+      byP.forEach((t) => root.appendChild(renderTaskItem(t)));
+    }
+  }
+  function addGroup(root, label) { const g = document.createElement("div"); g.className = "group-label"; g.innerHTML = esc(label) + '<span class="line"></span>'; root.appendChild(g); }
+
+  function renderNav() { $$("#nav button").forEach((b) => b.classList.toggle("active", b.dataset.view === currentView && !state.settings.project)); }
+  function renderProjects() {
+    const box = $("#projects"); box.innerHTML = "";
+    const allBtn = document.createElement("div"); allBtn.className = "proj" + (!state.settings.project ? " active" : "");
+    allBtn.innerHTML = '<span class="swatch" style="background:var(--muted)"></span>All projects';
+    allBtn.onclick = () => { state.settings.project = null; save(); render(); };
+    box.appendChild(allBtn);
+    state.projects.forEach((p) => {
+      const open = activeTasks().filter((t) => t.projectId === p.id).length;
+      const el = document.createElement("div"); el.className = "proj" + (state.settings.project === p.id ? " active" : "");
+      el.innerHTML = '<span class="swatch" style="background:' + p.color + '"></span>' + esc(p.name) + '<span class="cnt">' + open + '</span><span class="x" title="Delete project">✕</span>';
+      el.onclick = (e) => { if (e.target.classList.contains("x")) return; state.settings.project = p.id; if (currentView === "analytics") currentView = "all"; save(); render(); };
+      $(".x", el).onclick = (e) => { e.stopPropagation();
+        if (!confirm('Delete project "' + p.name + '"? Its tasks are kept but unassigned.')) return;
+        state.tasks.forEach((t) => { if (t.projectId === p.id) t.projectId = null; });
+        state.projects = state.projects.filter((x) => x.id !== p.id);
+        if (state.settings.project === p.id) state.settings.project = null; save(); render();
+      };
+      box.appendChild(el);
+    });
+  }
+
+  // ---------- focus timer ----------
+  let fMode = 25, fRemaining = 25 * 60, fRunning = false, fTicker = null, fTotal = 25 * 60;
+  function fmtT(s) { return String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0"); }
+  function updateFocusWidget() {
+    const t = state.tasks.find((x) => x.id === state.activeTaskId && !x.done);
+    if (!t && state.activeTaskId) state.activeTaskId = null;
+    $("#fwTask").innerHTML = "Focus: <b>" + (t ? esc(t.title.slice(0, 40)) : "no task selected") + "</b>";
+    $("#fwTime").textContent = fmtT(fRemaining);
+  }
+  function fTick() {
+    fRemaining--;
+    if (fRemaining <= 0) {
+      fStop();
+      if (fMode >= 15) { // count real focus sessions (25 or 15), not short breaks
+        const secs = fTotal; const k = todayKey();
+        state.focusLog.push({ date: k, seconds: secs, taskId: state.activeTaskId || null });
+        const t = state.tasks.find((x) => x.id === state.activeTaskId); if (t) t.focusSeconds = (t.focusSeconds || 0) + secs;
+        save(); toast("Focus session banked ⏱ +" + Math.round(secs / 60) + "m"); beep();
+        if (currentView === "analytics") render();
+      } else { toast("Break over — back to it!"); beep(); }
+      fRemaining = fTotal;
+    }
+    $("#fwTime").textContent = fmtT(fRemaining);
+  }
+  function fStart() { fRunning = true; $("#fwPlay").textContent = "Pause"; fTicker = setInterval(fTick, 1000); }
+  function fStop() { fRunning = false; $("#fwPlay").textContent = "Start"; clearInterval(fTicker); }
+  function beep() { try { const c = new (window.AudioContext || window.webkitAudioContext)(); [880, 1180].forEach((f, i) => { const o = c.createOscillator(), g = c.createGain(); o.frequency.value = f; o.connect(g); g.connect(c.destination); const t = c.currentTime + i * 0.16; g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.2, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.14); o.start(t); o.stop(t + 0.16); }); } catch (e) {} }
+
+  $("#fwPlay").onclick = () => (fRunning ? fStop() : fStart());
+  $("#fwReset").onclick = () => { fStop(); fRemaining = fTotal; updateFocusWidget(); };
+  $$("#fwModes button").forEach((b) => b.onclick = () => {
+    $$("#fwModes button").forEach((x) => x.classList.remove("on")); b.classList.add("on");
+    fMode = +b.dataset.min; fTotal = fMode * 60; fRemaining = fTotal; fStop(); updateFocusWidget();
+  });
+
+  // ---------- toast ----------
+  let toastT; function toast(m) { const t = $("#toast"); t.textContent = m; t.classList.add("show"); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("show"), 1600); }
+
+  // ---------- top-level wiring ----------
+  $$("#nav button").forEach((b) => b.onclick = () => { currentView = b.dataset.view; state.settings.project = null; state.settings.view = currentView; save(); openTaskId = null; render(); $("#sidebar").classList.remove("show"); });
+  $("#qaBtn").onclick = () => { const i = $("#qaInput"); addTask(i.value); i.value = ""; i.focus(); };
+  $("#qaInput").onkeydown = (e) => { if (e.key === "Enter") { addTask(e.target.value); e.target.value = ""; } };
+  $("#search").oninput = (e) => { searchQ = e.target.value.trim(); render(); };
+  $("#projAddBtn").onclick = () => { const w = $("#projAddWrap"); w.style.display = w.style.display === "none" ? "block" : "none"; if (w.style.display === "block") $("#projInput").focus(); };
+  $("#projInput").onkeydown = (e) => { if (e.key === "Enter") { const v = e.target.value.trim(); if (v) { state.projects.push({ id: uid(), name: v, color: PROJ_COLORS[state.projects.length % PROJ_COLORS.length] }); save(); e.target.value = ""; render(); } } };
+  $("#menuBtn").onclick = () => $("#sidebar").classList.toggle("show");
+
+  // theme
+  function applyTheme(t) { document.body.setAttribute("data-theme", t); $("#themeBtn").textContent = t === "light" ? "🌞" : "🌙"; state.settings.theme = t; save(); }
+  $("#themeBtn").onclick = () => applyTheme(document.body.getAttribute("data-theme") === "light" ? "dark" : "light");
+
+  // export / import
+  $("#exportBtn").onclick = () => {
+    const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "momentum-" + todayKey() + ".json"; a.click(); toast("Exported backup");
+  };
+  $("#importBtn").onclick = () => $("#fileInput").click();
+  $("#fileInput").onchange = (e) => { const f = e.target.files[0]; if (!f) return; const r = new FileReader();
+    r.onload = () => { try { const d = JSON.parse(r.result); if (!d.tasks) throw 0; state = Object.assign({}, DEFAULT, d); save(); currentView = state.settings.view || "today"; applyTheme(state.settings.theme || "dark"); render(); updateFocusWidget(); toast("Data imported"); } catch (err) { toast("Invalid file"); } };
+    r.readAsText(f); e.target.value = ""; };
+
+  // keyboard
+  document.addEventListener("keydown", (e) => {
+    if (e.target.matches("input,textarea,select")) { if (e.key === "Escape") e.target.blur(); return; }
+    if (e.key === "/") { e.preventDefault(); $("#search").focus(); }
+    else if (e.key === "n") { e.preventDefault(); $("#qaInput").focus(); }
+    else if (e.key === "f") { fRunning ? fStop() : fStart(); }
+  });
+
+  // ---------- boot ----------
+  applyTheme(state.settings.theme || "dark");
+  fTotal = fMode * 60; fRemaining = fTotal;
+  updateFocusWidget(); render();
+})();
+</script>
+</body>
+</html>

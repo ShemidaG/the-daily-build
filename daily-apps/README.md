@@ -10,6 +10,7 @@ Open [`index.html`](./index.html) for the gallery of everything built so far.
 
 | Day | Date | App | What it does |
 |-----|------|-----|--------------|
+| ★ | 2026-07-26 | [**Momentum**](./2026-07-26-momentum/) | **Flagship productivity command center** — projects, priorities, due dates, subtasks, Kanban board, focus timer, and an analytics dashboard |
 | 3 | 2026-07-26 | [Pulse](./2026-07-26-pulse/) | 16-step drum machine with live-synthesized sounds, swing, and random patterns |
 | 2 | 2026-07-26 | [Huely](./2026-07-26-huely/) | Color-palette generator with harmony modes, locking, and saved palettes |
 | 1 | 2026-07-24 | [FocusFlow](./2026-07-24-focusflow/) | Pomodoro timer + task list with stats, themes, and chimes |

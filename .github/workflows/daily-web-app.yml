@@ -42,10 +42,18 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           claude_args: "--max-turns 40"
           prompt: |
-            You have ~30 minutes to build ONE new small, self-contained web app of
-            your own choosing. Pick the idea yourself — do not ask anyone. You are
+            You have ~30 minutes to build ONE new self-contained web app of your
+            own choosing. Pick the idea yourself — do not ask anyone. You are
             running in a checkout of this repo on the main branch, which is served
             live via GitHub Pages.
+
+            QUALITY BAR (important): build a genuinely USEFUL, non-trivial tool that
+            could earn a place in someone's real workflow — NOT a basic toy or a
+            single-purpose gadget. Aim for the depth of the flagship "Momentum" app
+            (daily-apps/2026-07-26-momentum): multiple views/modes, meaningful state,
+            keyboard shortcuts, data export/import where relevant, thoughtful UI, and
+            localStorage persistence. Prefer productivity, planning, analysis, or
+            developer/creator tools. Everything must work fully offline in one file.
 
             Steps:
             1. Look at the existing apps in daily-apps/ so you choose a NEW idea

@@ -273,6 +273,11 @@
   .cmdk-item.sel, .cmdk-item:hover { background: var(--panel-2); }
   .cmdk-group { font-size: 10.5px; color: var(--faint); text-transform: uppercase; letter-spacing: 1px; font-weight: 700; padding: 10px 13px 5px; }
   .t-title-edit { width: 100%; background: var(--panel); border: 1px solid var(--accent); border-radius: 8px; padding: 8px 10px; font-size: 14.5px; font-weight: 600; outline: none; margin-bottom: 12px; }
+  .help-title { padding: 16px 20px; border-bottom: 1px solid var(--ring); font-weight: 800; font-size: 16px; }
+  .help-row { display: flex; align-items: center; gap: 12px; padding: 10px 16px; font-size: 14px; }
+  .help-row .hk { display: flex; gap: 4px; margin-left: auto; }
+  .help-row kbd { background: var(--panel-2); border: 1px solid var(--ring-2); border-bottom-width: 2px; border-radius: 6px; padding: 2px 8px; font-size: 12px; font-family: inherit; color: var(--text); font-weight: 700; }
+  .help-note { padding: 10px 16px 16px; color: var(--faint); font-size: 12.5px; }
 
   @media (max-width: 860px) {
     body { grid-template-columns: 1fr; }
@@ -329,7 +334,7 @@
         <div class="view-sub" id="viewSub"></div>
       </div>
       <div class="top-actions">
-        <div class="search"><span class="mag">🔍</span><input id="search" placeholder="Search tasks…" /></div>
+        <div class="search"><span class="mag">🔍</span><input id="search" placeholder="Search…  try p1, due:today, #proj, @tag" title="Operators: p1–p4 · due:today|tomorrow|overdue|week|none · #project · @tag · is:done|open · has:sub|notes · plus free text" /></div>
         <button class="icon-btn" id="cmdkBtn" title="Command palette (⌘K / Ctrl+K)">⌘K</button>
         <button class="icon-btn" id="exportBtn" title="Export JSON">⬇︎</button>
         <button class="icon-btn" id="importBtn" title="Import JSON">⬆︎</button>
@@ -358,6 +363,13 @@
     <div class="cmdk">
       <input id="cmdkInput" placeholder="Jump to a view, run an action, or search tasks…" autocomplete="off" />
       <div class="cmdk-list" id="cmdkList"></div>
+    </div>
+  </div>
+
+  <div class="cmdk-back" id="helpBack">
+    <div class="cmdk" style="max-width:460px">
+      <div class="help-title">Keyboard shortcuts</div>
+      <div class="cmdk-list" id="helpList"></div>
     </div>
   </div>
 
@@ -582,13 +594,34 @@
   function activeTasks() { return state.tasks.filter((t) => !t.done); }
   function projById(id) { return state.projects.find((p) => p.id === id); }
 
-  function matchesSearch(t) {
-    if (!searchQ) return true;
-    const q = searchQ.toLowerCase();
-    const pj = projById(t.projectId);
-    return t.title.toLowerCase().includes(q) || (t.notes || "").toLowerCase().includes(q) ||
-      t.tags.some((x) => x.toLowerCase().includes(q)) || (pj && pj.name.toLowerCase().includes(q));
+  let searchPreds = [];
+  function buildSearch(raw) {
+    const toks = (raw || "").trim().toLowerCase().split(/\s+/).filter(Boolean);
+    const preds = [], free = [];
+    const tKey = todayKey(), tmKey = tomorrowKey(), wkMax = key(addDays(new Date(), 7));
+    toks.forEach((tok) => {
+      let m;
+      if (/^!?p[1-4]$/.test(tok)) { const p = +tok.slice(-1); preds.push((t) => t.priority === p); }
+      else if ((m = tok.match(/^due:(.+)$/))) { const v = m[1];
+        if (v === "today") preds.push((t) => t.due === tKey);
+        else if (v === "tomorrow") preds.push((t) => t.due === tmKey);
+        else if (v === "overdue") preds.push((t) => t.due && t.due < tKey && !t.done);
+        else if (v === "week") preds.push((t) => t.due && t.due <= wkMax);
+        else if (v === "none") preds.push((t) => !t.due);
+      }
+      else if (tok === "overdue") preds.push((t) => t.due && t.due < tKey && !t.done);
+      else if ((m = tok.match(/^is:(done|open)$/))) preds.push((t) => (m[1] === "done" ? t.done : !t.done));
+      else if ((m = tok.match(/^has:(sub|subtasks|notes)$/))) preds.push((t) => (m[1] === "notes" ? !!(t.notes && t.notes.trim()) : t.subtasks.length > 0));
+      else if ((m = tok.match(/^#(.+)$/))) { const n = m[1]; preds.push((t) => { const p = projById(t.projectId); return p && p.name.toLowerCase().includes(n); }); }
+      else if ((m = tok.match(/^@(.+)$/))) { const n = m[1]; preds.push((t) => t.tags.some((x) => x.toLowerCase().includes(n))); }
+      else free.push(tok);
+    });
+    const ft = free.join(" ");
+    if (ft) preds.push((t) => { const p = projById(t.projectId); return t.title.toLowerCase().includes(ft) ||
+      (t.notes || "").toLowerCase().includes(ft) || t.tags.some((x) => x.toLowerCase().includes(ft)) || (p && p.name.toLowerCase().includes(ft)); });
+    return preds;
   }
+  function matchesSearch(t) { if (!searchQ) return true; return searchPreds.every((fn) => fn(t)); }
 
   function viewTasks() {
     let list = state.tasks.filter(matchesSearch);
@@ -1064,7 +1097,7 @@
   $$("#nav button").forEach((b) => b.onclick = () => { currentView = b.dataset.view; state.settings.project = null; state.settings.view = currentView; save(); openTaskId = null; render(); $("#sidebar").classList.remove("show"); });
   $("#qaBtn").onclick = () => { const i = $("#qaInput"); addTask(i.value); i.value = ""; i.focus(); };
   $("#qaInput").onkeydown = (e) => { if (e.key === "Enter") { addTask(e.target.value); e.target.value = ""; } };
-  $("#search").oninput = (e) => { searchQ = e.target.value.trim(); render(); };
+  $("#search").oninput = (e) => { searchQ = e.target.value.trim(); searchPreds = buildSearch(searchQ); render(); };
   $("#projAddBtn").onclick = () => { const w = $("#projAddWrap"); w.style.display = w.style.display === "none" ? "block" : "none"; if (w.style.display === "block") $("#projInput").focus(); };
   $("#projInput").onkeydown = (e) => { if (e.key === "Enter") { const v = e.target.value.trim(); if (v) { state.projects.push({ id: uid(), name: v, color: PROJ_COLORS[state.projects.length % PROJ_COLORS.length] }); save(); e.target.value = ""; render(); } } };
   $("#menuBtn").onclick = () => $("#sidebar").classList.toggle("show");
@@ -1132,13 +1165,35 @@
   $("#cmdkBack").onclick = (e) => { if (e.target === $("#cmdkBack")) closeCmd(); };
   $("#cmdkBtn").onclick = () => ($("#cmdkBack").classList.contains("show") ? closeCmd() : openCmd());
 
+  // ---------- help / shortcuts ----------
+  const SHORTCUTS = [
+    ["Command palette", ["⌘", "K"]], ["Search", ["/"]], ["New task", ["N"]],
+    ["Start / pause focus timer", ["F"]], ["This help", ["?"]], ["Close / blur field", ["Esc"]],
+  ];
+  function openHelp() {
+    const list = $("#helpList"); list.innerHTML = "";
+    SHORTCUTS.forEach(([desc, keys]) => {
+      const row = document.createElement("div"); row.className = "help-row";
+      row.innerHTML = "<span>" + desc + '</span><span class="hk">' + keys.map((k) => "<kbd>" + k + "</kbd>").join("") + "</span>";
+      list.appendChild(row);
+    });
+    const note = document.createElement("div"); note.className = "help-note";
+    note.innerHTML = "Search operators: <b>p1–p4</b>, <b>due:today|tomorrow|overdue|week|none</b>, <b>#project</b>, <b>@tag</b>, <b>is:done|open</b>, <b>has:sub|notes</b> — combine freely with text.";
+    list.appendChild(note);
+    $("#helpBack").classList.add("show");
+  }
+  function closeHelp() { $("#helpBack").classList.remove("show"); }
+  $("#helpBack").onclick = (e) => { if (e.target === $("#helpBack")) closeHelp(); };
+
   // keyboard
   document.addEventListener("keydown", (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); $("#cmdkBack").classList.contains("show") ? closeCmd() : openCmd(); return; }
+    if (e.key === "Escape" && $("#helpBack").classList.contains("show")) { closeHelp(); return; }
     if (e.target.matches("input,textarea,select")) { if (e.key === "Escape") e.target.blur(); return; }
     if (e.key === "/") { e.preventDefault(); $("#search").focus(); }
     else if (e.key === "n") { e.preventDefault(); $("#qaInput").focus(); }
     else if (e.key === "f") { fRunning ? fStop() : fStart(); }
+    else if (e.key === "?") { e.preventDefault(); $("#helpBack").classList.contains("show") ? closeHelp() : openHelp(); }
   });
 
   // ---------- boot ----------

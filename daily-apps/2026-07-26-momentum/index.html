@@ -339,6 +339,7 @@
       </div>
       <div class="top-actions">
         <div class="search"><span class="mag">🔍</span><input id="search" placeholder="Search…  try p1, due:today, #proj, @tag" title="Operators: p1–p4 · due:today|tomorrow|overdue|week|none · #project · @tag · is:done|open · has:sub|notes · plus free text" /></div>
+        <button class="icon-btn" id="notifyBtn" title="Enable due-time reminders">🔕</button>
         <button class="icon-btn" id="saveViewBtn" title="Save current search as a view">★</button>
         <button class="icon-btn" id="cmdkBtn" title="Command palette (⌘K / Ctrl+K)">⌘K</button>
         <button class="icon-btn" id="exportBtn" title="Export JSON">⬇︎</button>
@@ -389,7 +390,7 @@
 
   // ---------- state ----------
   const DEFAULT = { version: 1, projects: [], tasks: [], focusLog: [], templates: [], savedViews: [], activeTaskId: null,
-                    settings: { theme: "dark", view: "today", project: null } };
+                    settings: { theme: "dark", view: "today", project: null, notify: false } };
   let state = load();
   function load() {
     try { const s = JSON.parse(localStorage.getItem("momentum")); if (s && s.tasks) return Object.assign({}, DEFAULT, s); }
@@ -414,7 +415,7 @@
     return { id: uid(), title, notes: o.notes || "", priority: o.priority || 4, due: o.due || null,
       projectId: o.projectId || null, tags: o.tags || [], subtasks: o.subtasks || [], repeat: o.repeat || "none",
       status: o.status || "todo", done: false, createdAt: Date.now(), completedAt: null, focusSeconds: 0,
-      order: o.order != null ? o.order : -Date.now() };
+      order: o.order != null ? o.order : -Date.now(), dueTime: o.dueTime || null };
   }
 
   // ---------- dates ----------
@@ -435,16 +436,13 @@
     return d.toLocaleDateString(undefined, opts);
   }
   const WEEKDAYS = ["sun","mon","tue","wed","thu","fri","sat"];
+  function fmtTime(hhmm) { if (!hhmm) return ""; const [H, M] = hhmm.split(":").map(Number); const ap = H < 12 ? "AM" : "PM"; const h12 = H % 12 || 12; return h12 + ":" + String(M).padStart(2, "0") + " " + ap; }
+  function isTimePast(t) { if (!t.dueTime || t.due !== todayKey()) return false; const [H, M] = t.dueTime.split(":").map(Number); const d = new Date(); d.setHours(H, M, 0, 0); return new Date() > d; }
 
   // ---------- quick-add parser ----------
   function parseQuick(raw) {
     let text = raw.trim(); const out = { priority: 4, projectId: null, tags: [], due: null, repeat: "none" };
-    // recurrence: "every day/week/month/weekday" or daily/weekly/monthly
-    const REPEAT_MAP = { day: "daily", week: "weekly", month: "monthly", weekday: "weekday",
-      daily: "daily", weekly: "weekly", monthly: "monthly" };
-    text = text.replace(/\bevery\s+(day|week|month|weekday)\b/i, (m, u) => { out.repeat = REPEAT_MAP[u.toLowerCase()]; return " "; });
-    text = text.replace(/\b(daily|weekly|monthly)\b/i, (m, u) => { out.repeat = REPEAT_MAP[u.toLowerCase()]; return " "; });
-    if (out.repeat !== "none" && !out.due) out.due = todayKey();
+    // strip #project and @tag FIRST so words like "@daily" aren't mistaken for recurrence
     text = text.replace(/(?:^|\s)!?p([1-4])\b/gi, (m, p) => { out.priority = +p; return " "; });
     text = text.replace(/(?:^|\s)#([\w-]+)/g, (m, name) => {
       let pj = state.projects.find((p) => p.name.toLowerCase() === name.toLowerCase());
@@ -452,6 +450,13 @@
       out.projectId = pj.id; return " ";
     });
     text = text.replace(/(?:^|\s)@([\w-]+)/g, (m, t) => { out.tags.push(t); return " "; });
+    // recurrence: "every day/week/month/weekday" or daily/weekly/monthly
+    const REPEAT_MAP = { day: "daily", week: "weekly", month: "monthly", weekday: "weekday",
+      daily: "daily", weekly: "weekly", monthly: "monthly" };
+    text = text.replace(/\bevery\s+(day|week|month|weekday)\b/i, (m, u) => { out.repeat = REPEAT_MAP[u.toLowerCase()]; return " "; });
+    // bareword recurrence only when it's NOT the first word, so titles like "Weekly report" / "Daily standup" are preserved
+    text = text.replace(/\s(daily|weekly|monthly)\b/i, (m, u) => { out.repeat = REPEAT_MAP[u.toLowerCase()]; return " "; });
+    if (out.repeat !== "none" && !out.due) out.due = todayKey();
     // explicit date YYYY-MM-DD
     text = text.replace(/\b(\d{4}-\d{2}-\d{2})\b/, (m, d) => { out.due = d; return " "; });
     // keywords
@@ -469,6 +474,12 @@
         }
       }
     }
+    // time: "3pm", "at 3:30pm", "15:00"
+    text = text.replace(/\b(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i, (m, h, mm, ap) => {
+      let H = +h % 12; if (/pm/i.test(ap)) H += 12; out.dueTime = String(H).padStart(2, "0") + ":" + (mm || "00"); return " ";
+    });
+    if (!out.dueTime) text = text.replace(/\b(?:at\s+)([01]?\d|2[0-3]):([0-5]\d)\b/i, (m, h, mm) => { out.dueTime = String(+h).padStart(2, "0") + ":" + mm; return " "; });
+    if (out.dueTime && !out.due) out.due = todayKey();
     out.title = text.replace(/\s+/g, " ").trim();
     return out;
   }
@@ -654,7 +665,11 @@
     let html = "";
     const pj = projById(t.projectId);
     if (pj) html += '<span class="chip proj"><span style="width:7px;height:7px;border-radius:50%;background:' + pj.color + ';display:inline-block"></span>' + esc(pj.name) + "</span>";
-    if (t.due) { const cls = t.due < todayKey() ? " over" : (t.due === todayKey() ? " today" : ""); html += '<span class="chip due' + cls + '">🗓 ' + fmtDue(t.due) + "</span>"; }
+    if (t.due) {
+      const over = t.due < todayKey() || (!t.done && isTimePast(t));
+      const cls = over ? " over" : (t.due === todayKey() ? " today" : "");
+      html += '<span class="chip due' + cls + '">🗓 ' + fmtDue(t.due) + (t.dueTime ? " · " + fmtTime(t.dueTime) : "") + "</span>";
+    }
     const sc = t.subtasks.length; if (sc) { const dn = t.subtasks.filter((s) => s.done).length; html += '<span class="chip sub">☑ ' + dn + "/" + sc + "</span>"; }
     if (t.focusSeconds > 60) html += '<span class="chip foc">⏱ ' + Math.round(t.focusSeconds / 60) + "m</span>";
     if (t.repeat && t.repeat !== "none") html += '<span class="chip sub">🔁 ' + t.repeat + "</span>";
@@ -729,6 +744,7 @@
       '<input class="t-title-edit" data-ed="title" value="' + esc(t.title) + '" placeholder="Task title">' +
       '<div class="edit-grid">' +
         '<div class="field"><label>Due date</label><input type="date" data-ed="due" value="' + (t.due || "") + '"></div>' +
+        '<div class="field"><label>Time</label><input type="time" data-ed="duetime" value="' + (t.dueTime || "") + '"></div>' +
         '<div class="field"><label>Priority</label><select data-ed="priority">' + prioOpts + "</select></div>" +
         '<div class="field"><label>Project</label><select data-ed="project">' + projOpts + "</select></div>" +
         '<div class="field"><label>Repeat</label><select data-ed="repeat">' + repeatOpts + "</select></div>" +
@@ -748,6 +764,7 @@
     titleEl.onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); commitTitle(e); render(); } };
     $("[data-ed=repeat]", el).onchange = (e) => { updTask(t.id, { repeat: e.target.value }); render(); };
     $("[data-ed=due]", el).onchange = (e) => { updTask(t.id, { due: e.target.value || null }); softRefresh(); };
+    $("[data-ed=duetime]", el).onchange = (e) => { const v = e.target.value || null; const patch = { dueTime: v }; if (v && !t.due) patch.due = todayKey(); updTask(t.id, patch); render(); };
     $("[data-ed=priority]", el).onchange = (e) => { updTask(t.id, { priority: +e.target.value }); softRefresh(); };
     $("[data-ed=project]", el).onchange = (e) => { updTask(t.id, { projectId: e.target.value || null }); softRefresh(); };
     $("[data-ed=notes]", el).onblur = (e) => updTask(t.id, { notes: e.target.value });
@@ -1234,9 +1251,45 @@
     else if (e.key === "?") { e.preventDefault(); $("#helpBack").classList.contains("show") ? closeHelp() : openHelp(); }
   });
 
+  // ---------- due-time reminders ----------
+  const notifiedIds = new Set();
+  function reminderTick() {
+    const now = new Date(), tk = todayKey();
+    state.tasks.forEach((t) => {
+      if (t.done || !t.due || !t.dueTime || t.due !== tk || notifiedIds.has(t.id)) return;
+      const [H, M] = t.dueTime.split(":").map(Number); const dt = new Date(); dt.setHours(H, M, 0, 0);
+      if (now >= dt) { notifiedIds.add(t.id); fireReminder(t); }
+    });
+  }
+  function fireReminder(t) {
+    toast("⏰ Due now: " + t.title.slice(0, 48));
+    if (state.settings.notify && "Notification" in window && Notification.permission === "granted") {
+      try { new Notification("Momentum — task due", { body: t.title, tag: "momentum-" + t.id }); } catch (e) {}
+    }
+  }
+  function updateNotifyBtn() {
+    const on = !!state.settings.notify && ("Notification" in window) && Notification.permission === "granted";
+    $("#notifyBtn").textContent = on ? "🔔" : "🔕";
+    $("#notifyBtn").title = on ? "Due-time reminders on — click to mute" : "Enable due-time reminders";
+    $("#notifyBtn").style.color = on ? "var(--accent-2)" : "";
+  }
+  $("#notifyBtn").onclick = () => {
+    if (state.settings.notify) { state.settings.notify = false; save(); updateNotifyBtn(); toast("Reminders muted"); return; }
+    if (!("Notification" in window)) { toast("This browser can't show notifications"); return; }
+    Notification.requestPermission().then((p) => {
+      if (p === "granted") { state.settings.notify = true; save(); updateNotifyBtn(); toast("Reminders on — you'll be pinged when timed tasks are due 🔔"); }
+      else toast("Notifications blocked in the browser");
+    });
+  };
+
   // ---------- boot ----------
   applyTheme(state.settings.theme || "dark");
   fTotal = fMode * 60; fRemaining = fTotal;
+  // seed already-passed timed tasks so we only notify ones that come due during this session
+  (function seedNotified() { const now = new Date(), tk = todayKey();
+    state.tasks.forEach((t) => { if (t.dueTime && t.due === tk) { const [H, M] = t.dueTime.split(":").map(Number); const dt = new Date(); dt.setHours(H, M, 0, 0); if (now >= dt) notifiedIds.add(t.id); } }); })();
+  updateNotifyBtn();
+  setInterval(reminderTick, 30000);
   updateFocusWidget(); render();
 })();
 </script>

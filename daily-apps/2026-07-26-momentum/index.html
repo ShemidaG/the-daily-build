@@ -124,6 +124,8 @@
   .chip.tag { background: transparent; color: var(--faint); border: 1px solid var(--ring); }
   .chip.sub { background: var(--panel-2); color: var(--muted); }
   .chip.foc { background: var(--panel-2); color: var(--accent-2); }
+  .t-prog { height: 4px; border-radius: 3px; background: var(--panel-2); margin-top: 9px; overflow: hidden; max-width: 320px; }
+  .t-prog > i { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); transition: width .3s ease; }
   .t-actions { display: flex; gap: 4px; opacity: 0; transition: opacity .15s; }
   .task:hover .t-actions { opacity: 1; }
   .t-actions button { border: none; background: transparent; color: var(--faint); cursor: pointer; font-size: 15px; padding: 5px 7px; border-radius: 7px; }
@@ -305,6 +307,8 @@
       <button data-view="analytics"><span class="ico">📊</span> Analytics</button>
       <button data-view="completed"><span class="ico">✅</span> Completed <span class="badge" id="b-done">0</span></button>
     </nav>
+    <div class="side-section" id="viewsSection" style="display:none">Saved views</div>
+    <div class="projects" id="savedViews" style="flex:none"></div>
     <div class="side-section">Projects <span class="add" id="projAddBtn" title="Add project">＋</span></div>
     <div class="proj-add" id="projAddWrap" style="display:none">
       <input id="projInput" placeholder="Project name, Enter to add" maxlength="40" />
@@ -335,6 +339,7 @@
       </div>
       <div class="top-actions">
         <div class="search"><span class="mag">🔍</span><input id="search" placeholder="Search…  try p1, due:today, #proj, @tag" title="Operators: p1–p4 · due:today|tomorrow|overdue|week|none · #project · @tag · is:done|open · has:sub|notes · plus free text" /></div>
+        <button class="icon-btn" id="saveViewBtn" title="Save current search as a view">★</button>
         <button class="icon-btn" id="cmdkBtn" title="Command palette (⌘K / Ctrl+K)">⌘K</button>
         <button class="icon-btn" id="exportBtn" title="Export JSON">⬇︎</button>
         <button class="icon-btn" id="importBtn" title="Import JSON">⬆︎</button>
@@ -383,7 +388,7 @@
   const P_COLORS = { 1: "var(--p1)", 2: "var(--p2)", 3: "var(--p3)", 4: "var(--p4)" };
 
   // ---------- state ----------
-  const DEFAULT = { version: 1, projects: [], tasks: [], focusLog: [], templates: [], activeTaskId: null,
+  const DEFAULT = { version: 1, projects: [], tasks: [], focusLog: [], templates: [], savedViews: [], activeTaskId: null,
                     settings: { theme: "dark", view: "today", project: null } };
   let state = load();
   function load() {
@@ -391,7 +396,7 @@
     catch (e) {}
     // seed a friendly first-run example
     const pid = uid();
-    return { version: 1, activeTaskId: null, focusLog: [], templates: [],
+    return { version: 1, activeTaskId: null, focusLog: [], templates: [], savedViews: [],
       projects: [{ id: pid, name: "Getting Started", color: PROJ_COLORS[0] }],
       settings: { theme: "dark", view: "today", project: null },
       tasks: [
@@ -549,6 +554,8 @@
   let selectMode = false; // multi-select for bulk actions
   const selected = new Set();
   let dragReorderId = null; // task id being reordered
+  let savingView = false; // inline "name this saved view" input is open
+  let activeViewId = null; // currently applied saved view
 
   function applyListOpts(list) {
     let out = list;
@@ -670,6 +677,7 @@
         '<div class="t-flag" style="background:' + P_COLORS[t.priority] + '"></div>' +
         '<div class="t-body" data-act="open"><div class="t-title">' + esc(t.title) + "</div>" +
           (hasMeta ? '<div class="t-meta">' + taskChips(t) + "</div>" : "") +
+          (t.subtasks.length ? '<div class="t-prog"><i style="width:' + Math.round(t.subtasks.filter((s) => s.done).length / t.subtasks.length * 100) + '%"></i></div>' : "") +
         "</div>" +
         '<div class="t-actions">' +
           '<button data-act="focus" class="' + (state.activeTaskId === t.id ? "focusing" : "") + '" title="Set as focus task">⏱</button>' +
@@ -949,7 +957,7 @@
     analytics: ["Analytics", "Your productivity at a glance"], completed: ["Completed", "Finished and archived"] };
 
   function render() {
-    updateCounts(); renderProjects(); renderNav();
+    updateCounts(); renderProjects(); renderSavedViews(); renderNav();
     const [title, subFixed] = TITLES[currentView];
     let sub = subFixed;
     if (state.settings.project) { const p = projById(state.settings.project); if (p) sub += " · in " + p.name; }
@@ -1027,24 +1035,53 @@
     $("#bulk-cancel", bar).onclick = () => { selectMode = false; selected.clear(); render(); };
   }
 
-  function renderNav() { $$("#nav button").forEach((b) => b.classList.toggle("active", b.dataset.view === currentView && !state.settings.project)); }
+  function renderNav() { $$("#nav button").forEach((b) => b.classList.toggle("active", b.dataset.view === currentView && !state.settings.project && !activeViewId)); }
   function renderProjects() {
     const box = $("#projects"); box.innerHTML = "";
     const allBtn = document.createElement("div"); allBtn.className = "proj" + (!state.settings.project ? " active" : "");
     allBtn.innerHTML = '<span class="swatch" style="background:var(--muted)"></span>All projects';
-    allBtn.onclick = () => { state.settings.project = null; save(); render(); };
+    allBtn.onclick = () => { state.settings.project = null; activeViewId = null; save(); render(); };
     box.appendChild(allBtn);
     state.projects.forEach((p) => {
       const open = activeTasks().filter((t) => t.projectId === p.id).length;
       const el = document.createElement("div"); el.className = "proj" + (state.settings.project === p.id ? " active" : "");
       el.innerHTML = '<span class="swatch" style="background:' + p.color + '"></span>' + esc(p.name) + '<span class="cnt">' + open + '</span><span class="x" title="Delete project">✕</span>';
-      el.onclick = (e) => { if (e.target.classList.contains("x")) return; state.settings.project = p.id; if (currentView === "analytics") currentView = "all"; save(); render(); };
+      el.onclick = (e) => { if (e.target.classList.contains("x")) return; state.settings.project = p.id; activeViewId = null; if (currentView === "analytics") currentView = "all"; save(); render(); };
       $(".x", el).onclick = (e) => { e.stopPropagation();
         if (!confirm('Delete project "' + p.name + '"? Its tasks are kept but unassigned.')) return;
         state.tasks.forEach((t) => { if (t.projectId === p.id) t.projectId = null; });
         state.projects = state.projects.filter((x) => x.id !== p.id);
         if (state.settings.project === p.id) state.settings.project = null; save(); render();
       };
+      box.appendChild(el);
+    });
+  }
+
+  function applyView(v) {
+    activeViewId = v.id; searchQ = v.query; searchPreds = buildSearch(v.query);
+    $("#search").value = v.query; currentView = "all"; state.settings.project = null; render();
+  }
+  function renderSavedViews() {
+    const box = $("#savedViews"); box.innerHTML = "";
+    $("#viewsSection").style.display = (state.savedViews.length || savingView) ? "flex" : "none";
+    if (savingView) {
+      const wrap = document.createElement("div"); wrap.className = "proj-add";
+      wrap.innerHTML = '<input id="viewNameInput" placeholder="Name this view, Enter to save" maxlength="40">';
+      box.appendChild(wrap);
+      const inp = $("#viewNameInput", wrap); inp.value = searchQ;
+      inp.onkeydown = (e) => {
+        if (e.key === "Enter") { const n = e.target.value.trim(); if (n) { state.savedViews.push({ id: uid(), name: n, query: searchQ }); save(); } savingView = false; render(); }
+        else if (e.key === "Escape") { savingView = false; render(); }
+      };
+      setTimeout(() => inp.focus(), 10);
+    }
+    state.savedViews.forEach((v) => {
+      const el = document.createElement("div"); el.className = "proj" + (activeViewId === v.id ? " active" : "");
+      el.innerHTML = '<span class="swatch" style="background:var(--accent-2)">🔎</span>' + esc(v.name) + '<span class="x" title="Delete view">✕</span>';
+      $(".swatch", el).textContent = ""; // keep dot style
+      el.title = "Search: " + v.query;
+      el.onclick = (e) => { if (e.target.classList.contains("x")) return; applyView(v); };
+      $(".x", el).onclick = (e) => { e.stopPropagation(); state.savedViews = state.savedViews.filter((x) => x.id !== v.id); if (activeViewId === v.id) activeViewId = null; save(); render(); };
       box.appendChild(el);
     });
   }
@@ -1094,10 +1131,11 @@
   }
 
   // ---------- top-level wiring ----------
-  $$("#nav button").forEach((b) => b.onclick = () => { currentView = b.dataset.view; state.settings.project = null; state.settings.view = currentView; save(); openTaskId = null; render(); $("#sidebar").classList.remove("show"); });
+  $$("#nav button").forEach((b) => b.onclick = () => { currentView = b.dataset.view; state.settings.project = null; state.settings.view = currentView; activeViewId = null; save(); openTaskId = null; render(); $("#sidebar").classList.remove("show"); });
   $("#qaBtn").onclick = () => { const i = $("#qaInput"); addTask(i.value); i.value = ""; i.focus(); };
   $("#qaInput").onkeydown = (e) => { if (e.key === "Enter") { addTask(e.target.value); e.target.value = ""; } };
-  $("#search").oninput = (e) => { searchQ = e.target.value.trim(); searchPreds = buildSearch(searchQ); render(); };
+  $("#search").oninput = (e) => { searchQ = e.target.value.trim(); searchPreds = buildSearch(searchQ); activeViewId = null; render(); };
+  $("#saveViewBtn").onclick = () => { if (!searchQ) { toast("Type a search first, then save it as a view."); $("#search").focus(); return; } savingView = true; render(); };
   $("#projAddBtn").onclick = () => { const w = $("#projAddWrap"); w.style.display = w.style.display === "none" ? "block" : "none"; if (w.style.display === "block") $("#projInput").focus(); };
   $("#projInput").onkeydown = (e) => { if (e.key === "Enter") { const v = e.target.value.trim(); if (v) { state.projects.push({ id: uid(), name: v, color: PROJ_COLORS[state.projects.length % PROJ_COLORS.length] }); save(); e.target.value = ""; render(); } } };
   $("#menuBtn").onclick = () => $("#sidebar").classList.toggle("show");

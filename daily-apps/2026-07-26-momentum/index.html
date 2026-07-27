@@ -6,22 +6,27 @@
 <title>Momentum — Productivity Command Center</title>
 <style>
   :root {
-    --bg: #0e1020; --bg-2: #141733; --panel: #191d3d; --panel-2: #20244a; --panel-3: #272c58;
-    --ring: #2c3162; --ring-2: #383e78; --text: #eef0ff; --muted: #9096c8; --faint: #6b70a0;
-    --accent: #6c7dff; --accent-2: #46e0c8; --shadow: 0 24px 60px -30px rgba(0,0,0,.75);
-    --p1: #ff5f6d; --p2: #ffab3d; --p3: #4db2ff; --p4: #7a80b0; --ok: #46e0c8; --warn: #ff5f6d;
+    /* dusk pastel (dark mode) */
+    --bg: #2b2442; --bg-2: #342c4e; --panel: #3c3358; --panel-2: #473c67; --panel-3: #524673;
+    --ring: #574a7c; --ring-2: #6b5c94; --text: #f4ecff; --muted: #c3b3e4; --faint: #8f80b6;
+    --accent: #f7a8ca; --accent-2: #93e0c8; --shadow: 0 16px 40px -18px rgba(30,18,50,.7);
+    --p1: #ff8fab; --p2: #ffcf8f; --p3: #a8caf5; --p4: #b7a8d6; --ok: #93e0c8; --warn: #ff8fab;
   }
   [data-theme="light"] {
-    --bg: #eef1fb; --bg-2: #e6eaf7; --panel: #ffffff; --panel-2: #f2f4fd; --panel-3: #e9ecfa;
-    --ring: #dde1f4; --ring-2: #cbd1ee; --text: #191d3d; --muted: #5c6398; --faint: #8b91be;
-    --accent: #5566e6; --accent-2: #12b5a0; --shadow: 0 24px 60px -34px rgba(50,60,130,.35);
-    --p4: #9096c0;
+    /* daytime pastel — soft lavender / pink / mint */
+    --bg: #e8dcf4; --bg-2: #f4edfb; --panel: #fffdff; --panel-2: #f6eefb; --panel-3: #efe5f8;
+    --ring: #d9c9ed; --ring-2: #c6b0e2; --text: #6a5a86; --muted: #9a88bb; --faint: #b9a9d2;
+    --accent: #f48fb8; --accent-2: #63cdb0; --shadow: 0 16px 38px -20px rgba(180,140,200,.5);
+    --p1: #ff8fab; --p2: #f6b26b; --p3: #8fbdf0; --p4: #c3b4d9; --ok: #63cdb0; --warn: #f37aa0;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; }
   body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    background: var(--bg); color: var(--text); display: grid; grid-template-columns: 260px 1fr; height: 100vh;
+    font-family: "Trebuchet MS", "Segoe UI", system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    background-image: radial-gradient(rgba(255,255,255,.35) 1.4px, transparent 1.4px);
+    background-size: 16px 16px;
+    color: var(--text); display: grid; grid-template-columns: 260px 1fr; height: 100vh;
     overflow: hidden; transition: background .3s ease, color .3s ease;
   }
   button, input, select, textarea { font-family: inherit; color: inherit; }
@@ -292,9 +297,43 @@
     .search input { width: 130px; } .search input:focus { width: 150px; }
   }
   .menu-btn { display: none; }
+
+  /* ======== kawaii pastel skin ======== */
+  ::-webkit-scrollbar-thumb { background: var(--accent-2); border-radius: 999px; }
+  .brand { letter-spacing: .4px; }
+  .brand::after { content: "♡"; color: var(--accent); margin-left: 2px; }
+  /* pixel-heart logo */
+  .brand .logo {
+    width: 3px; height: 3px; border-radius: 0; background: transparent; box-shadow: none;
+    margin: 7px 14px 7px 5px; align-self: center;
+    box-shadow:
+      3px 0 var(--accent), 6px 0 var(--accent), 12px 0 var(--accent), 15px 0 var(--accent),
+      0 3px var(--accent), 3px 3px var(--accent), 6px 3px var(--accent), 9px 3px var(--accent), 12px 3px var(--accent), 15px 3px var(--accent), 18px 3px var(--accent),
+      0 6px var(--accent), 3px 6px var(--accent), 6px 6px var(--accent), 9px 6px var(--accent), 12px 6px var(--accent), 15px 6px var(--accent), 18px 6px var(--accent),
+      3px 9px var(--accent), 6px 9px var(--accent), 9px 9px var(--accent), 12px 9px var(--accent), 15px 9px var(--accent),
+      6px 12px var(--accent), 9px 12px var(--accent), 12px 12px var(--accent),
+      9px 15px var(--accent);
+  }
+  /* chunky rounded "window" panels */
+  .task, .panel-card, .stat-card, .col, .wday, .backlog { border-width: 2px; border-radius: 16px; }
+  .bcard, .wcard, .cmdk, .tpl-chip, .qa-wrap, .icon-btn, .proj-add input, .add-row input, .lc { border-width: 2px; }
+  .qa-wrap { border-radius: 18px; }
+  .icon-btn { border-radius: 12px; }
+  .nav button { border-radius: 12px; }
+  .nav button.active { box-shadow: 0 6px 14px -7px var(--accent); }
+  .chip { border-radius: 999px; }
+  .topbar, .quickadd { border-bottom-width: 2px; }
+  .sidebar { border-right-width: 2px; }
+  .focus-widget { border-top-width: 2px; }
+  .fw-time { color: var(--accent); }
+  .view-title::after { content: "✦"; color: var(--accent-2); font-size: .55em; vertical-align: super; margin-left: 6px; }
+  .t-flag { border-radius: 999px; }
+  /* soft focus glows in pastel */
+  .qa-wrap:focus-within, .search input:focus { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent); }
+  .btn.primary, .qa-wrap button, .cta { box-shadow: 0 8px 18px -8px var(--accent); }
 </style>
 </head>
-<body data-theme="dark">
+<body data-theme="light">
   <!-- Sidebar -->
   <aside class="sidebar" id="sidebar">
     <div class="brand"><span class="logo"></span> Momentum</div>
@@ -390,7 +429,7 @@
 
   // ---------- state ----------
   const DEFAULT = { version: 1, projects: [], tasks: [], focusLog: [], templates: [], savedViews: [], activeTaskId: null,
-                    settings: { theme: "dark", view: "today", project: null, notify: false } };
+                    settings: { theme: "light", view: "today", project: null, notify: false } };
   let state = load();
   function load() {
     try { const s = JSON.parse(localStorage.getItem("momentum")); if (s && s.tasks) return Object.assign({}, DEFAULT, s); }
@@ -399,7 +438,7 @@
     const pid = uid();
     return { version: 1, activeTaskId: null, focusLog: [], templates: [], savedViews: [],
       projects: [{ id: pid, name: "Getting Started", color: PROJ_COLORS[0] }],
-      settings: { theme: "dark", view: "today", project: null },
+      settings: { theme: "light", view: "today", project: null },
       tasks: [
         mkTask("Welcome to Momentum — click me to open details", { priority: 2, projectId: pid, due: todayKey(),
           notes: "Momentum is your command center: projects, priorities, due dates, subtasks, a focus timer, and analytics.\n\nTry the quick-add above with !p1, #Project, @tag and a due date like 'tomorrow'.",
@@ -1168,7 +1207,7 @@
   };
   $("#importBtn").onclick = () => $("#fileInput").click();
   $("#fileInput").onchange = (e) => { const f = e.target.files[0]; if (!f) return; const r = new FileReader();
-    r.onload = () => { try { const d = JSON.parse(r.result); if (!d.tasks) throw 0; state = Object.assign({}, DEFAULT, d); save(); currentView = state.settings.view || "today"; applyTheme(state.settings.theme || "dark"); render(); updateFocusWidget(); toast("Data imported"); } catch (err) { toast("Invalid file"); } };
+    r.onload = () => { try { const d = JSON.parse(r.result); if (!d.tasks) throw 0; state = Object.assign({}, DEFAULT, d); save(); currentView = state.settings.view || "today"; applyTheme(state.settings.theme || "light"); render(); updateFocusWidget(); toast("Data imported"); } catch (err) { toast("Invalid file"); } };
     r.readAsText(f); e.target.value = ""; };
 
   // ---------- command palette ----------
@@ -1283,7 +1322,7 @@
   };
 
   // ---------- boot ----------
-  applyTheme(state.settings.theme || "dark");
+  applyTheme(state.settings.theme || "light");
   fTotal = fMode * 60; fRemaining = fTotal;
   // seed already-passed timed tasks so we only notify ones that come due during this session
   (function seedNotified() { const now = new Date(), tk = todayKey();

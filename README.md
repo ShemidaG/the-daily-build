@@ -1,11 +1,10 @@
 # the-daily-build → Momentum
 
-**One productivity tool, made a little better every day — by Claude.**
+**A productivity command center that runs entirely in your browser.**
 
-This repo builds and continuously improves **Momentum**, a productivity command
-center that runs entirely in your browser. Every day at **12:00 PM Manila time**,
-Claude spends ~30 minutes adding a genuinely useful improvement — a new feature,
-a refinement, or a polish pass — and ships it.
+This repo holds **Momentum**, a productivity app built by Claude. The automatic
+daily-build/improvement schedule has been **retired** — the app is complete as-is
+and only changes when someone edits it directly.
 
 ## 🚀 Use it
 
@@ -30,20 +29,13 @@ data stays in your browser (with JSON export/import for backups).
 - **Quality of life** — search, undo delete, keyboard shortcuts, JSON
   export/import, dark/light themes
 
-## 🛠️ How the daily improvement runs
+## 🛠️ Status
 
-1. **GitHub Action (permanent)** — [`.github/workflows/daily-web-app.yml`](.github/workflows/daily-web-app.yml)
-   runs on a `cron` at `04:00 UTC` (= 12 PM Manila) every day. It improves
-   Momentum and pushes to `main` (served live by GitHub Pages) using a Claude
-   **Pro/Max subscription** via a `CLAUDE_CODE_OAUTH_TOKEN` secret — no
-   pay-per-use API billing.
-2. **In-session scheduler** — while a Claude Code session is live, an in-memory
-   daily job does the same thing.
-
-See [`daily-apps/README.md`](daily-apps/README.md) for the one-time token setup.
+The automatic daily schedule (GitHub Action + in-session job) has been **removed**.
+Momentum no longer updates on its own; the `CLAUDE_CODE_OAUTH_TOKEN` repo secret is
+no longer used and can be deleted from the repo settings whenever you like.
 
 ## 🌱 Principles
 
-- **Depth over novelty.** Improve one real tool instead of shipping throwaway toys.
-- **Always usable.** Every change is verified to run error-free before it ships.
+- **Always usable.** Fully offline, single file, no backend.
 - **Yours and private.** Offline-first; your data never leaves your browser.
